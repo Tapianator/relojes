@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged, 
+            signInWithEmailAndPassword, 
+            signOut,
+            setPersistence,
+            browserSessionPersistence // <-- CAMBIADO
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+        import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
+
+        // --- CONFIGURACIÓN DE FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OC8PG4ClleCxQ",
+            authDomain: "sbx-relojes-web.firebaseapp.com",
+            projectId: "sbx-relojes-web",
+            storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c", 
+            messagingSenderId: "326032897645",
+            appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app, "relojes");
+        const storage = getStorage(app); 
+
+        // --- INICIALIZACIÓN DE APP CHECK ---
+        const appCheck = initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider('6LepBPcrAAAAALCfr-9FnQjgBVZdJn_0ZRXpNVqR'), 
+            isTokenAutoRefreshEnabled: true
+        });
+
+        // --- Elementos del DOM ---
+        const loginSection = document.getElementById('login-section');
+        const adminSection = document.getElementById('admin-section');
+        const loginForm = document.getElementById('login-form');
+        const loginEmail = document.getElementById('login-email');
+        const loginPassword = document.getElementById('login-password');
+        const loginError = document.getElementById('login-error');
+        const userInfo = document.getElementById('user-info');
+        const logoutButton = document.getElementById('logout-button');
+        const saveWatchForm = document.getElementById('save-watch-form');
+        const saveButton = document.getElementById('save-button');
+        const saveButtonText = document.getElementById('save-button-text');
+        const saveSpinner = document.getElementById('save-spinner');
+        const formMessage = document.getElementById('form-message');
+
+        // --- LÓGICA DE AUTENTICACIÓN ---
+        setPersistence(auth, browserSessionPersistence) // <-- CAMBIADO
+            .then(() => {
+                console.log("Persistencia de sesión configurada.");
+            })
+            .catch((error) => {
+                console.error("Error al configurar persistencia: ", error);
+            });
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loginSection.classList.add('hidden');
+                adminSection.classList.remove('hidden');
+                userInfo.textContent = `Bienvenido, ${user.email}`;
+            } else {
+                loginSection.classList.remove('hidden');
+                adminSection.classList.add('hidden');
+            }
+        });
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = loginEmail.value;
+            const password = loginPassword.value;
+            loginError.classList.add('hidden');
+
+            signInWithEmailAndPassword(auth, email, password)
+                .catch((error) => {
+                    console.error("Error al iniciar sesión: ", error);
+                    loginError.textContent = `Error: ${error.message}`;
+                    loginError.classList.remove('hidden');
+                });
+        });
+
+        logoutButton.addEventListener('click', () => {
+            signOut(auth);
+        });
+
+        // --- LÓGICA DE GUARDAR RELOJ ---
+        saveWatchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            formMessage.classList.add('hidden');
+            setLoading(true);
+
+            console.log("--- DEBUG: Iniciando guardado de reloj ---");
+
+            const user = auth.currentUser;
+            
+            if (!user) {
+                console.error("DEBUG: ¡ERROR! Intento de guardado sin usuario autenticado.");
+                showMessage("Error: No estás autenticado. Por favor, inicia sesión de nuevo.", true);
+                setLoading(false);
+                return;
+            }
+            console.log(`DEBUG: Usuario autenticado: ${user.email} (UID: ${user.uid})`);
+            
+            const watchName = document.getElementById('name').value;
+            const watchPrice = document.getElementById('price').value;
+            const storageFolder = document.getElementById('folder').value;
+            const shortDesc = document.getElementById('shortDesc').value;
+            const longDesc = document.getElementById('longDesc').value;
+            const videoUrl = document.getElementById('videoUrl').value;
+            const isSold = document.getElementById('isSold').checked;
+            const mainImageFile = document.getElementById('mainImage').files[0];
+            const galleryFiles = document.getElementById('gallery').files;
+
+            if (!mainImageFile || !storageFolder) {
+                showMessage("Error: Faltan la imagen principal o el nombre de la carpeta.", true);
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // 1. Subir Imagen Principal
+                console.log(`DEBUG: Intentando subir imagen principal a: ${storageFolder}/${mainImageFile.name}`);
+                const mainImageRef = ref(storage, `${storageFolder}/${mainImageFile.name}`);
+                const mainImageSnapshot = await uploadBytes(mainImageRef, mainImageFile);
+                const mainImagePath = mainImageSnapshot.metadata.fullPath;
+                console.log(`DEBUG: Imagen principal subida: ${mainImagePath}`);
+
+                // 2. Subir Galería (múltiples archivos)
+                let galleryPaths = [];
+                console.log(`DEBUG: Intentando subir ${galleryFiles.length} imágenes de galería.`);
+                for (const file of galleryFiles) {
+                    const galleryRef = ref(storage, `${storageFolder}/${file.name}`);
+                    const gallerySnapshot = await uploadBytes(galleryRef, file);
+                    galleryPaths.push(gallerySnapshot.metadata.fullPath);
+                }
+                console.log(`DEBUG: Imágenes de galería subidas:`, galleryPaths);
+
+                // 3. Preparar datos para Firestore
+                const watchData = {
+                    name: watchName,
+                    price: watchPrice,
+                    shortDesc: shortDesc,
+                    longDesc: longDesc,
+                    videoUrl: videoUrl,
+                    isSold: isSold,
+                    mainImage: mainImagePath, 
+                    gallery: galleryPaths     
+                };
+
+                // 4. Guardar en Firestore
+                console.log(`DEBUG: Intentando guardar datos en Firestore, colección 'wathces'`);
+                const docRef = await addDoc(collection(db, "wathces"), watchData);
+                console.log(`DEBUG: ¡Éxito! Documento creado con ID: ${docRef.id}`);
+                
+                showMessage("¡Reloj guardado con éxito!", false);
+                saveWatchForm.reset();
+
+            } catch (error) {
+                console.error("--- DEBUG: ERROR CRÍTICO AL GUARDAR EL RELOJ ---");
+                console.error("Código de Error:", error.code); 
+                console.error("Mensaje de Error:", error.message);
+                console.error("Objeto de Error Completo:", error);
+                
+                let friendlyMessage = "Error al subir el reloj. Revisa la consola para más detalles.";
+                if (error.code === 'storage/unauthorized') {
+                    friendlyMessage = "Error: Permiso denegado por Storage. Asegúrate de que las Reglas de Storage (Paso 5) y la configuración de CORS (Paso 3) de la guía estén aplicadas.";
+                } else if (error.code === 'permission-denied') {
+                     friendlyMessage = "Error: Permiso denegado por Firestore. Asegúrate de que las Reglas de Firestore (Paso 4) estén aplicadas.";
+                }
+                showMessage(friendlyMessage, true);
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // --- Funciones de Utilidad ---
+        function setLoading(isLoading) {
+            if (isLoading) {
+                saveButton.disabled = true;
+                saveButtonText.classList.add('hidden');
+                saveSpinner.classList.remove('hidden');
+            } else {
+                saveButton.disabled = false;
+                saveButtonText.classList.remove('hidden');
+                saveSpinner.classList.add('hidden');
+            }
+        }
+
+        function showMessage(message, isError = false) {
+            formMessage.textContent = message;
+            formMessage.className = isError 
+                ? 'text-red-500 text-sm mt-4' 
+                : 'text-green-500 text-sm mt-4';
+            formMessage.classList.remove('hidden');
+        }
+
+    </script>
+
+    <!-- Sección de Login -->
+    <div id="login-section" class="flex items-center justify-center min-h-screen bg-gray-900">
+        <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-center text-gray-900">Iniciar Sesión - Admin</h2>
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label for="login-email" class="text-sm font-medium text-gray-700">Email</label>
+                    <input id="login-email" name="email" type="email" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" value="" placeholder="tu@email.com">
+                </div>
+                <div>
+                    <label for="login-password" class="text-sm font-medium text-gray-700">Contraseña</label>
+                    <input id="login-password" name="password" type="password" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <p id="login-error" class="text-sm text-red-500 hidden"></p>
+                <button type="submit" class="w-full px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Entrar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sección de Administración (Oculta por defecto) -->
+    <div id="admin-section" class="hidden">
+        <header class="bg-white shadow-md sticky top-0 z-30">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- NAVEGACIÓN ACTUALIZADA -->
+                    <div class="flex items-baseline space-x-4">
+                        <h1 class="text-xl font-bold text-gray-900">Panel de Administración</h1>
+                        <a href="admin.html" class="text-sm text-blue-600 font-semibold hover:text-blue-700">Agregar Reloj</a>
+                        <a href="editar.html" class="text-sm text-gray-600 hover:text-blue-600">Editar Colección</a>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span id="user-info" class="text-sm text-gray-600"></span>
+                        <button id="logout-button" class="px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                            Cerrar Sesión
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+            <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-bold mb-6 text-gray-900">Agregar Nuevo Reloj</h2>
+                <form id="save-watch-form" class="space-y-6">
+                    
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700">Nombre del Reloj</label>
+                        <input type="text" id="name" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="price" class="block text-sm font-medium text-gray-700">Precio (ej: $15,000 USD)</label>
+                            <input type="text" id="price" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="folder" class="block text-sm font-medium text-gray-700">Nombre Carpeta en Storage (ej: rolex-gmt)</label>
+                            <input type="text" id="folder" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="shortDesc" class="block text-sm font-medium text-gray-700">Descripción Corta</label>
+                        <textarea id="shortDesc" rows="2" class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+
+                    <div>
+                        <label for="longDesc" class="block text-sm font-medium text-gray-700">Descripción Larga</label>
+                        <textarea id="longDesc" rows="4" class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+
+                    <div>
+                        <label for="videoUrl" class="block text-sm font-medium text-gray-700">URL Video YouTube (formato "embed")</label>
+                        <input type="text" id="videoUrl" placeholder="https://www.youtube.com/embed/VIDEO_ID" class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <div>
+                        <label for="mainImage" class="block text-sm font-medium text-gray-700">Imagen Principal</label>
+                        <input type="file" id="mainImage" accept="image/*" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+
+                    <div>
+                        <label for="gallery" class="block text-sm font-medium text-gray-700">Imágenes de Galería (múltiples)</label>
+                        <input type="file" id="gallery" accept="image/*,video/*" multiple class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+
+                    <div class="flex items-center">
+                        <input id="isSold" type="checkbox" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <label for="isSold" class="ml-2 block text-sm font-medium text-gray-900">Marcar como Vendido</slabel>
+                    </div>
+
+                    <div>
+                        <button id="save-button" type="submit" class="w-full px-4 py-2 font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 flex items-center justify-center">
+                            <span id="save-button-text">Guardar Reloj</span>
+                            <span id="save-spinner" class="spinner hidden"></span>
+                        </button>
+                    </div>
+                    
+                    <p id="form-message" class="text-sm hidden"></p>
+
+                </form>
+            </div>
+        </main>
+    </div>
+
+</body>
+</html>
+
+
