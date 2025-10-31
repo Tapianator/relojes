@@ -4,7 +4,7 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const { getStorage } = require("firebase-admin/storage");
 const { initializeApp } = require("firebase-admin/app");
-const { getAppCheck } = require("firebase-admin/app-check"); // Importar App Check
+// const { getAppCheck } = require("firebase-admin/app-check"); // Importar App Check (YA NO SE USA)
 const logger = require("firebase-functions/logger");
 
 // Inicializa la app de Admin. Esto es requerido para App Check y Storage.
@@ -22,36 +22,36 @@ const SERVICE_ACCOUNT_EMAIL = "326032897645-compute@developer.gserviceaccount.co
 /**
  * Cloud Function: getSignedUrl
  * * Expone un endpoint HTTP que:
- * 1. Verifica el token de App Check para seguridad.
+ * 1. (SE HA ELIMINADO) Verificación de App Check.
  * 2. Genera una URL firmada (temporal) para un archivo en un bucket privado.
  */
 exports.getSignedUrl = onRequest(
   { cors: true }, // Habilita CORS automáticamente
   async (req, res) => {
     
-    // --- 1. VERIFICACIÓN DE APP CHECK ---
-    logger.info("Iniciando verificación de App Check...");
-    const appCheckToken = req.headers["x-firebase-appcheck"]; // El token viene del header
+    // --- 1. VERIFICACIÓN DE APP CHECK (DESACTIVADA) ---
+    // logger.info("Iniciando verificación de App Check...");
+    // const appCheckToken = req.headers["x-firebase-appcheck"]; // El token viene del header
 
-    if (!appCheckToken) {
-      logger.warn("Petición rechazada: No se encontró el token de App Check ('x-firebase-appcheck').");
-      res.status(401).send("Unauthorized: Missing App Check token.");
-      return;
-    }
+    // if (!appCheckToken) {
+    //   logger.warn("Petición rechazada: No se encontró el token de App Check ('x-firebase-appcheck').");
+    //   res.status(401).send("Unauthorized: Missing App Check token.");
+    //   return;
+    // }
 
-    try {
-      // Verifica el token
-      await getAppCheck().verifyToken(appCheckToken);
-      logger.info("Token de App Check verificado con éxito.");
-    } catch (err) {
-      logger.error("Petición rechazada: El token de App Check es inválido.", err);
-      res.status(401).send("Unauthorized: Invalid App Check token.");
-      return;
-    }
+    // try {
+    //   // Verifica el token
+    //   await getAppCheck().verifyToken(appCheckToken);
+    //   logger.info("Token de App Check verificado con éxito.");
+    // } catch (err) {
+    //   logger.error("Petición rechazada: El token de App Check es inválido.", err);
+    //   res.status(401).send("Unauthorized: Invalid App Check token.");
+    //   return;
+    // }
     // --- FIN DE LA VERIFICACIÓN DE APP CHECK ---
 
     
-    // --- 2. LÓGICA DE LA FUNCIÓN (Solo se ejecuta si App Check es válido) ---
+    // --- 2. LÓGICA DE LA FUNCIÓN (Ahora se ejecuta siempre) ---
     const filePath = req.query.filePath;
 
     if (!filePath) {
@@ -82,4 +82,3 @@ exports.getSignedUrl = onRequest(
     }
   }
 );
-

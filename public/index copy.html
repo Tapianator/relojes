@@ -9,7 +9,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        /* Base para las relaciones de aspecto */
+        .aspect-w-1 { --tw-aspect-w: 1; }
+        .aspect-h-1 { --tw-aspect-h: 1; }
+        .aspect-w-16 { --tw-aspect-w: 16; }
+        .aspect-h-9 { --tw-aspect-h: 9; }
+        .aspect-video { padding-bottom: calc(var(--tw-aspect-h) / var(--tw-aspect-w) * 100%); position: relative; }
+        .aspect-video > * { position: absolute; height: 100%; width: 100%; top: 0; left: 0; }
+
+
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f3e8; /* Color base de papiro muy claro */
+            color: #333; /* Texto principal oscuro */
+        }
         .modal-enter { animation: fadeIn 0.3s ease-out forwards; }
         .modal-leave { animation: fadeOut 0.3s ease-in forwards; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -21,32 +34,48 @@
         .loader, .img-loader::before {
             content: '';
             box-sizing: border-box;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-top-color: #fff;
+            border: 3px solid rgba(100, 100, 100, 0.3); /* Loader oscuro */
+            border-top-color: #333;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
         .loader { width: 40px; height: 40px; }
-        .img-loader { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.5); }
+        .img-loader { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.5); }
         .img-loader::before { width: 30px; height: 30px; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Estilo para asegurar que el contenido de la sección esté sobre el fondo */
+        .section-content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+         /* Overlay sutil para las secciones con fondo */
+        .section-overlay::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+        }
+        #about.section-overlay::before { background-color: rgba(247, 243, 232, 0.9); } /* bg-[#f7f3e8]/90 */
+        #collection.section-overlay::before { background-color: rgba(235, 228, 205, 0.9); } /* bg-[#ebe4cd]/90 */
+
     </style>
 </head>
-<body class="bg-gray-900 text-white">
+<body class="text-gray-900">
 
-    <!-- ===== Header ===== -->
-    <header class="bg-gray-900/80 backdrop-blur-sm sticky top-0 z-40">
+    <header class="bg-[#f7f3e8]/80 backdrop-blur-sm sticky top-0 z-40 border-b border-[#ddcca6]">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
-                <div class="flex-shrink-0">
-                    <a href="#" class="text-2xl font-bold tracking-wider text-white">CHRONOS</a>
+                <div class="flex-shrink-0 flex items-center">
+                    <img src="imagenes/logo.svg" alt="Nayra Pacha Logo" class="w-14 h-14 mr-2" style="object-fit: contain;">
+                    <a href="#" class="text-2xl font-bold tracking-wider text-gray-900">Nayra Pacha</a>
                 </div>
                 <nav class="hidden md:block">
                     <div class="ml-10 flex items-baseline space-x-4">
-                        <a href="#hero" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Inicio</a>
-                        <a href="#about" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Nosotros</a>
-                        <a href="#collection" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Colección</a>
-                        <a href="#contact" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Contacto</a>
+                        <a href="#hero" class="text-gray-700 hover:bg-[#ddcca6] px-3 py-2 rounded-md text-sm font-medium">Inicio</a>
+                        <a href="#about" class="text-gray-700 hover:bg-[#ddcca6] px-3 py-2 rounded-md text-sm font-medium">Nosotros</a>
+                        <a href="#collection" class="text-gray-700 hover:bg-[#ddcca6] px-3 py-2 rounded-md text-sm font-medium">Colección</a>
+                        <a href="#contact" class="text-gray-700 hover:bg-[#ddcca6] px-3 py-2 rounded-md text-sm font-medium">Contacto</a>
                     </div>
                 </nav>
             </div>
@@ -54,40 +83,37 @@
     </header>
 
     <main>
-        <!-- ===== Hero Section ===== -->
         <section id="hero" class="relative h-[60vh] md:h-[80vh] flex items-center justify-center text-center overflow-hidden">
-             <!-- Video Background -->
              <video autoplay loop muted playsinline class="absolute inset-0 w-full h-full object-cover -z-10">
                  <source src="video/test.mp4" type="video/mp4">
                  Tu navegador no soporta el tag de video. Considera usar una imagen de fondo como fallback.
              </video>
-             <!-- Overlay -->
-            <div class="absolute inset-0 bg-black/60"></div>
-             <!-- Content -->
-            <div class="relative z-10 px-4">
+             <div class="absolute inset-0 bg-black/50"></div>
+             <div class="relative z-10 px-4">
                 <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-4">Elegancia Atemporal</h1>
                 <p class="text-lg md:text-xl max-w-2xl mx-auto text-gray-200 mb-8">Descubre nuestra exclusiva selección de relojes, donde la precisión se encuentra con el diseño.</p>
-                <a href="#collection" class="bg-white text-gray-900 hover:bg-gray-200 font-bold py-3 px-8 rounded-lg text-lg transition duration-300">Ver Colección</a>
-                            </div>
+                <a href="#collection" class="bg-[#333] text-white hover:bg-gray-700 font-bold py-3 px-8 rounded-lg text-lg transition duration-300 shadow-xl">Ver Colección</a>
+            </div>
         </section>
 
-        <!-- ===== About Section ===== -->
-        <section id="about" class="py-20 bg-gray-800">
-             <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                 <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Nuestra Pasión</h2>
-                 <div class="max-w-3xl mx-auto text-gray-300 space-y-4">
-                     <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-                     <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+        <section id="about" class="relative py-20 bg-center bg-no-repeat border-b border-[#ddcca6] section-overlay" style="background-image: url('imagenes/volcan.svg');">
+             <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center section-content-wrapper">
+                 <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-6">Nuestra Pasión</h2>
+                 <div class="max-w-3xl mx-auto text-gray-700 space-y-4">
+                     <p>Nuestro nombre, Nayra Pacha, se traduce del aymara como "Tiempo Antiguo". Y define nuestra misión, que honra el doble significado de la palabra Nayra ("antiguo" y también "ojo"): tener el ojo experto para encontrar lo mejor del tiempo pasado.</p>
+                     <p>Reunimos una colección que honra la historia de la relojería. Creemos en la elegancia de los automáticos, en el carácter de los mecánicos y en la mística de los cuarzos destructores de imperios.</p>
+                     <p>No somos un taller, somos un puente. Somos los exploradores que encuentran la pieza y los curadores que gestionan su servicio con profesionales. No podemos prometer que cada restauración sea idéntica, pero sí garantizamos nuestro compromiso principal: cada reloj que sale de nuestras manos está probado y en perfecto estado de funcionamiento.</p>
+                     <p>Estas máquinas están listas para su segunda vida. Piezas de colección para el coleccionista exigente, o accesorios con alma para el día a día.</p>
+                     <p>Te invitamos a encontrar esa pieza de historia que te estaba esperando.</p>
                  </div>
             </div>
         </section>
 
-        <!-- ===== Collection Section ===== -->
-        <section id="collection" class="py-20 bg-gray-900">
-            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <section id="collection" class="relative py-20 bg-center bg-no-repeat border-b border-[#ddcca6] section-overlay" style="background-image: url('imagenes/logo_full.svg');">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 section-content-wrapper">
                 <div class="text-center mb-12">
-                    <h2 class="text-3xl md:text-4xl font-bold text-white">Nuestra Colección</h2>
-                    <p class="text-gray-400 mt-2">Piezas maestras de la relojería moderna y clásica.</p>
+                    <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Nuestra Colección</h2>
+                    <p class="text-gray-700 mt-2">Piezas maestras de la relojería moderna y clásica.</p>
                 </div>
                 <div id="watch-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 min-h-[300px] flex items-center justify-center">
                     <div id="loader" class="loader"></div>
@@ -95,41 +121,37 @@
             </div>
         </section>
 
-        <!-- ===== Contact Section ===== -->
-        <section id="contact" class="py-20 bg-gray-800">
+        <section id="contact" class="py-20 bg-[#ddcca6]">
             <div class="container mx-auto px-4 text-center">
-                <h2 class="text-3xl font-bold mb-4">¿Interesado en una pieza?</h2>
-                <p class="text-gray-300 max-w-xl mx-auto mb-8">Contáctanos para consultas o para coordinar tu compra.</p>
-                <a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20uno%20de%20sus%20relojes." target="_blank" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center">
+                <h2 class="text-3xl font-bold mb-4 text-gray-900">¿Interesado en una pieza?</h2>
+                <p class="text-gray-700 max-w-xl mx-auto mb-8">Contáctanos para consultas o para coordinar tu compra.</p>
+                <a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20uno%20de%20sus%20relojes." target="_blank" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center shadow-md">
                     Contactar por WhatsApp
                 </a>
             </div>
         </section>
     </main>
 
-    <!-- ===== Footer ===== -->
-    <footer class="bg-gray-900 border-t border-gray-700">
+    <footer class="bg-[#333] border-t border-gray-700">
         <div class="container mx-auto py-6 px-4 text-center text-gray-400">
-            <p>&copy; 2025 CHRONOS. Todos los derechos reservados.</p>
+            <p>&copy; 2025 Nayra Pacha. Todos los derechos reservados.</p>
         </div>
     </footer>
 
-    <!-- ===== Modal ===== -->
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden modal-enter">
-        <div id="modal-content" class="bg-gray-800 rounded-lg shadow-xl w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto relative modal-content-enter"></div>
+        <div id="modal-content" class="bg-[#ddcca6] text-gray-900 rounded-lg shadow-xl w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto relative modal-content-enter"></div>
     </div>
 
-    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        // Importar App Check (usando ReCaptchaV3Provider) y getToken
-        import { initializeAppCheck, ReCaptchaV3Provider, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
+        
+        // --- PASO 1: Importación de App Check COMENTADA ---
+        // import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
 
         // --- CONFIGURACIÓN DE FIREBASE ---
-        // (Usa la configuración de tu proyecto)
         const firebaseConfig = {
-            apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OC8PG4ClleCxQ",
+            apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
             authDomain: "sbx-relojes-web.firebaseapp.com",
             projectId: "sbx-relojes-web",
             storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c",
@@ -142,11 +164,11 @@
 
         const app = initializeApp(firebaseConfig);
 
-        // --- INICIALIZACIÓN DE APP CHECK (RECAPTCHA V3) ---
-        const appCheck = initializeAppCheck(app, {
-            provider: new ReCaptchaV3Provider('6LepBPcrAAAAALCfr-9FnQjgBVZdJn_0ZRXpNVqR'), // Tu clave v3 Clásica
-            isTokenAutoRefreshEnabled: true
-        });
+        // --- PASO 2: Inicialización de App Check COMENTADA ---
+        // const appCheck = initializeAppCheck(app, {
+        //    provider: new ReCaptchaEnterpriseProvider('6Lfadv0rAAAAADTYezhxnhJwzb47txP_koX54GD1'), 
+        //    isTokenAutoRefreshEnabled: true
+        // });
 
         const db = getFirestore(app, "relojes");
         let watchesData = [];
@@ -159,26 +181,20 @@
                 return 'https://placehold.co/600x600/1a202c/ffffff?text=Ruta+no+especificada';
             }
             if (signedUrlCache.has(filePath)) {
-                return signedUrlCache.get(filePath);
+                return signedUrlCache.get(filePath); 
             }
             try {
-                // *** INICIO DE LA CORRECCIÓN ***
-                // 1. Obtener el token de App Check manualmente
-                let appCheckTokenResult;
-                try {
-                    appCheckTokenResult = await getToken(appCheck, /* forceRefresh= */ false);
-                } catch (err) {
-                    console.error("Error al obtener el token de App Check:", err);
-                    throw new Error("Error de App Check");
-                }
+                // --- PASO 3: Lógica de token y headers COMENTADA ---
+                // let appCheckTokenResult;
+                // try {
+                //     appCheckTokenResult = await getToken(appCheck, /* forceRefresh= */ false);
+                // } catch (err) {
+                //     console.error("Error al obtener el token de App Check:", err);
+                //     throw new Error("Error de App Check");
+                // }
 
-                // 2. Adjuntar el token como un Header en el 'fetch'
-                const response = await fetch(`${getSignedUrlFunctionUrl}?filePath=${encodeURIComponent(filePath)}`, {
-                    headers: {
-                        'X-Firebase-AppCheck': appCheckTokenResult.token,
-                    },
-                });
-                // *** FIN DE LA CORRECCIÓN ***
+                // Se llama a fetch SIN el objeto de headers
+                const response = await fetch(`${getSignedUrlFunctionUrl}?filePath=${encodeURIComponent(filePath)}`);
 
                 if (!response.ok) {
                     console.error(`Error en la respuesta de la Cloud Function: ${response.status} - ${await response.text()}`);
@@ -198,12 +214,11 @@
             const loader = document.getElementById('loader');
 
             try {
-                // App Check protege esta llamada automáticamente
                 const querySnapshot = await getDocs(collection(db, "wathces"));
 
                 if (querySnapshot.empty) {
                     loader.style.display = 'none';
-                    watchGrid.innerHTML = `<p class="text-yellow-400">No se encontraron relojes en la base de datos.</p>`;
+                    watchGrid.innerHTML = `<p class="text-yellow-700">No se encontraron relojes en la base de datos.</p>`;
                     return; 
                 }
 
@@ -215,7 +230,7 @@
             } catch (error) {
                 console.error("Error CRÍTICO al obtener los relojes de Firestore: ", error);
                 loader.style.display = 'none';
-                watchGrid.innerHTML = `<p class="text-red-400">No se pudo cargar la colección. Revisa la consola para más detalles.</p>`;
+                watchGrid.innerHTML = `<p class="text-red-600">No se pudo cargar la colección. Revisa la consola para más detalles.</p>`;
             }
 
             // --- FUNCIÓN PARA CREAR TARJETAS ---
@@ -223,27 +238,27 @@
                 watchGrid.innerHTML = '';
                 for (const watch of watchesData) {
                     const card = document.createElement('div');
-                    card.className = 'bg-gray-800 rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-2 transition-transform duration-300 cursor-pointer relative';
+                    card.className = 'bg-[#ebe4cd] rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer relative border border-[#ddcca6]';
                     
                     const watchName = watch.name || "Nombre no disponible";
                     const watchShortDesc = watch.shortDesc || "Descripción no disponible.";
                     const watchPrice = watch.price || "Precio no disponible";
-                    const mainImage = watch.mainImage || watch.mainimage;
+                    const mainImage = watch.mainImage || watch.mainimage; // Maneja ambos casos por si acaso
 
                     const soldOverlay = watch.isSold ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center"><span class="text-white text-2xl font-bold border-2 border-white py-2 px-4 rounded-md">VENDIDO</span></div>` : '';
 
                     card.innerHTML = `
-                        <div class="relative h-72 bg-gray-700">
+                        <div class="relative h-72 bg-gray-400">
                             <div class="img-loader"></div>
-                            <img class="w-full h-full object-cover hidden" data-src="${mainImage}" alt="${watchName}" />
+                            <img class="w-full h-full object-cover hidden" data-src="${mainImage}" alt="${watchName}" /> 
                             ${soldOverlay}
                         </div>
                         <div class="p-6">
-                            <h3 class="text-xl font-bold text-white mb-2">${watchName}</h3>
-                            <p class="text-gray-400 mb-4">${watchShortDesc}</p>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">${watchName}</h3>
+                            <p class="text-gray-700 mb-4">${watchShortDesc}</p>
                             <div class="flex justify-between items-center">
-                                <span class="text-lg font-semibold text-white">${watchPrice}</span>
-                                <button data-id="${watch.id}" class="view-details-btn bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-4 border border-transparent rounded-lg transition">Ver Detalles</button>
+                                <span class="text-lg font-semibold text-gray-900">${watchPrice}</span>
+                                <button data-id="${watch.id}" class="view-details-btn bg-[#ddcca6] hover:bg-[#c9b78e] text-gray-900 font-semibold py-2 px-4 border border-transparent rounded-lg transition shadow-sm">Ver Detalles</button>
                             </div>
                         </div>
                     `;
@@ -252,7 +267,8 @@
                     const imgElement = card.querySelector('img[data-src]');
                     const loaderElement = card.querySelector('.img-loader');
                     try {
-                        const url = await getSignedUrl(mainImage);
+                        // Importante: Usar mainImage que ya definimos arriba
+                        const url = await getSignedUrl(mainImage); 
                         imgElement.src = url;
                         imgElement.onload = () => {
                             imgElement.classList.remove('hidden');
@@ -260,7 +276,7 @@
                         };
                         imgElement.onerror = () => {
                              console.error(`Error: No se pudo cargar la imagen desde la URL firmada para ${watchName}.`);
-                             if(loaderElement) loaderElement.innerHTML = `<p class="text-xs text-red-300 p-2 text-center">Error al cargar imagen</p>`;
+                             if(loaderElement) loaderElement.innerHTML = `<p class="text-xs text-red-600 p-2 text-center">Error al cargar imagen</p>`;
                         }
                     } catch (e) {
                          if(loaderElement) loaderElement.style.display = 'none';
@@ -281,20 +297,27 @@
                     ? await Promise.all(watch.gallery.map(getSignedUrl)) 
                     : [];
                 
-                const galleryHtml = galleryUrls.map(url => `<img src="${url}" alt="Vista de ${watch.name}" class="w-full rounded-md object-cover">`).join('');
-                const videoHtml = watch.videoUrl ? `<div class="mt-6"><h4 class="text-xl font-semibold mb-2 text-white">Video</h4><div class="aspect-w-16 aspect-h-9"><iframe class="rounded-lg" src="${watch.videoUrl}" frameborder="0" allowfullscreen></iframe></div></div>` : '';
-                const buyButton = watch.isSold ? `<div class="w-full bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg text-center">Vendido</div>` : `<a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20el%20reloj%20${encodeURIComponent(watch.name)}." target="_blank" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition inline-flex items-center justify-center">Comprar por WhatsApp</a>`;
+                // Imágenes de la galería dentro del modal ahora son cuadradas y cubren el espacio.
+                const galleryHtml = galleryUrls.map(url => `
+                    <div class="aspect-video"> <img src="${url}" alt="Vista de ${watch.name}" class="w-full h-full rounded-md object-cover border border-[#ddcca6]">
+                    </div>
+                `).join(''); 
+                
+                const videoHtml = watch.videoUrl ? `<div class="mt-6"><h4 class="text-xl font-semibold mb-2 text-gray-900">Video</h4><div class="aspect-w-16 aspect-h-9"><iframe class="rounded-lg border border-[#ddcca6]" src="${watch.videoUrl}" frameborder="0" allowfullscreen></iframe></div></div>` : '';
+                const buyButton = watch.isSold ? `<div class="w-full bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg text-center shadow-md">Vendido</div>` : `<a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20el%20reloj%20${encodeURIComponent(watch.name)}." target="_blank" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition inline-flex items-center justify-center shadow-md">Comprar por WhatsApp</a>`;
 
                 modalContent.innerHTML = `
-                    <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-400 hover:text-white z-10">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-700 hover:text-gray-900 z-10">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                     <div class="p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div>
-                            <h3 class="text-3xl font-bold text-white mb-4">${watch.name || "Sin nombre"}</h3>
-                            <p class="text-gray-300 mb-6">${watch.longDesc || "Sin descripción."}</p>
-                            <span class="text-2xl font-bold text-white block mb-6">${watch.price || "Sin precio"}</span>
-                            ${buyButton}
+                        <div class="relative bg-[#f7f3e8]/80 rounded-lg p-6" style="background-image: url('imagenes/logo_full.svg'); background-size: contain; background-repeat: no-repeat; background-position: center;">
+                            <div class="absolute inset-0 bg-[#f7f3e8]/70 rounded-lg"></div> <div class="relative z-10">
+                                <h3 class="text-3xl font-bold text-gray-900 mb-4">${watch.name || "Sin nombre"}</h3>
+                                <p class="text-gray-700 mb-6">${watch.longDesc || "Sin descripción."}</p>
+                                <span class="text-2xl font-bold text-gray-900 block mb-6">${watch.price || "Sin precio"}</span>
+                                ${buyButton}
+                            </div>
                         </div>
                         <div class="space-y-4">${galleryHtml}${videoHtml}</div>
                     </div>
