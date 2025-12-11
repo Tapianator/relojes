@@ -59,11 +59,27 @@
         #about.section-overlay::before { background-color: rgba(247, 243, 232, 0.9); } /* bg-[#f7f3e8]/90 */
         #collection.section-overlay::before { background-color: rgba(235, 228, 205, 0.9); } /* bg-[#ebe4cd]/90 */
 
+        /* Estilos para tarjetas de grupo con imagen */
+        .group-card-image {
+            background-size: cover;
+            background-position: center;
+            position: relative;
+        }
+        .group-card-image::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.6); /* Overlay oscuro */
+            border-radius: 0.5rem; /* Mismo rounded-lg que la tarjeta */
+            z-index: 0;
+        }
+
     </style>
 </head>
 <body class="text-gray-900">
 
     <header class="bg-[#f7f3e8]/80 backdrop-blur-sm sticky top-0 z-40 border-b border-[#ddcca6]">
+        
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex-shrink-0 flex items-center">
@@ -83,6 +99,7 @@
     </header>
 
     <main>
+        
         <section id="hero" class="relative h-[60vh] md:h-[80vh] flex items-center justify-center text-center overflow-hidden">
              <video autoplay loop muted playsinline class="absolute inset-0 w-full h-full object-cover -z-10">
                  <source src="video/test.mp4" type="video/mp4">
@@ -109,25 +126,60 @@
             </div>
         </section>
 
+        
         <section id="collection" class="relative py-20 bg-center bg-no-repeat border-b border-[#ddcca6] section-overlay" style="background-image: url('imagenes/logo_full.svg');">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8 section-content-wrapper">
                 <div class="text-center mb-12">
                     <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Nuestra Colección</h2>
                     <p class="text-gray-700 mt-2">Piezas maestras de la relojería moderna y clásica.</p>
                 </div>
-                <div id="watch-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 min-h-[300px] flex items-center justify-center">
+
+                
+                <div id="filter-bar" class="mb-8 p-6 bg-[#ebe4cd]/70 rounded-lg shadow-sm border border-[#ddcca6] flex flex-col sm:flex-row justify-between items-center gap-4 hidden">
+                    
+                    <div class="hidden"> 
+                        <label for="group-by-select" class="block text-sm font-medium text-gray-800 mb-1">Agrupar por:</label>
+                        <select id="group-by-select" class="rounded-md shadow-sm bg-white border-[#ddcca6] text-gray-900 focus:border-gray-500 focus:ring-gray-500">
+                            <option value="origin" selected>País de Origen</option>
+                            <option value="decade">Década</option>
+                            <option value="brand">Marca</option>
+                            <option value="type">Tipo</option>
+                        </select>
+                    </div>
+                    
+                    <button id="back-to-groups-btn" class="bg-[#ddcca6] hover:bg-[#c9b78e] text-gray-900 font-semibold py-2 px-4 border border-transparent rounded-lg transition shadow-sm">
+                        &larr; Volver a Grupos
+                    </button>
+                </div>
+                
+                <h3 id="group-title" class="text-2xl font-bold text-gray-900 text-center mb-8 hidden"></h3>
+
+                
+                <div id="gallery-container" class="min-h-[300px] flex items-center justify-center">
+                    
                     <div id="loader" class="loader"></div>
+                    
                 </div>
             </div>
         </section>
 
+        
         <section id="contact" class="py-20 bg-[#ddcca6]">
             <div class="container mx-auto px-4 text-center">
                 <h2 class="text-3xl font-bold mb-4 text-gray-900">¿Interesado en una pieza?</h2>
                 <p class="text-gray-700 max-w-xl mx-auto mb-8">Contáctanos para consultas o para coordinar tu compra.</p>
-                <a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20uno%20de%20sus%20relojes." target="_blank" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center shadow-md">
-                    Contactar por WhatsApp
-                </a>
+                
+                <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+                    
+                    <a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20uno%20de%20sus%20relojes." target="_blank" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center shadow-md w-full sm:w-auto">
+                        Contactar por WhatsApp
+                    </a>
+
+                    <a href="https://instagram.com/TU_USUARIO" target="_blank" class="bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 hover:opacity-90 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center shadow-md w-full sm:w-auto">
+                        Seguir en Instagram
+                    </a>
+
+                </div>
             </div>
         </section>
     </main>
@@ -138,6 +190,7 @@
         </div>
     </footer>
 
+    
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden modal-enter">
         <div id="modal-content" class="bg-[#ddcca6] text-gray-900 rounded-lg shadow-xl w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto relative modal-content-enter"></div>
     </div>
@@ -146,10 +199,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
-        // --- PASO 1: Importación de App Check COMENTADA ---
-        // import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
-
-        // --- CONFIGURACIÓN DE FIREBASE ---
+        // --- CONFIGURACIÓN DE FIREBASE (Sin cambios) ---
         const firebaseConfig = {
             apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
             authDomain: "sbx-relojes-web.firebaseapp.com",
@@ -158,23 +208,18 @@
             messagingSenderId: "326032897645",
             appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
         };
-        
-        // --- URL DE TU CLOUD FUNCTION ---
         const getSignedUrlFunctionUrl = 'https://us-central1-sbx-relojes-web.cloudfunctions.net/getSignedUrl';
 
         const app = initializeApp(firebaseConfig);
-
-        // --- PASO 2: Inicialización de App Check COMENTADA ---
-        // const appCheck = initializeAppCheck(app, {
-        //    provider: new ReCaptchaEnterpriseProvider('6Lfadv0rAAAAADTYezhxnhJwzb47txP_koX54GD1'), 
-        //    isTokenAutoRefreshEnabled: true
-        // });
-
         const db = getFirestore(app, "relojes");
-        let watchesData = [];
+        let watchesData = []; // Guardará todos los relojes de la DB
         const signedUrlCache = new Map();
 
-        // --- FUNCIÓN PARA OBTENER URL SEGURA Y TEMPORAL ---
+        // --- ESTADO DE LA APLICACIÓN ---
+        let currentGroupingKey = 'origin'; // Criterio de agrupación actual
+        let currentView = 'groups'; // 'groups' o 'items'
+
+        // --- FUNCIÓN PARA OBTENER URL SEGURA Y TEMPORAL (Sin cambios) ---
         async function getSignedUrl(filePath) {
             if (!filePath) {
                 console.error("Error: se intentó obtener URL para una ruta de archivo vacía.");
@@ -184,18 +229,7 @@
                 return signedUrlCache.get(filePath); 
             }
             try {
-                // --- PASO 3: Lógica de token y headers COMENTADA ---
-                // let appCheckTokenResult;
-                // try {
-                //     appCheckTokenResult = await getToken(appCheck, /* forceRefresh= */ false);
-                // } catch (err) {
-                //     console.error("Error al obtener el token de App Check:", err);
-                //     throw new Error("Error de App Check");
-                // }
-
-                // Se llama a fetch SIN el objeto de headers
                 const response = await fetch(`${getSignedUrlFunctionUrl}?filePath=${encodeURIComponent(filePath)}`);
-
                 if (!response.ok) {
                     console.error(`Error en la respuesta de la Cloud Function: ${response.status} - ${await response.text()}`);
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -209,82 +243,250 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            const watchGrid = document.getElementById('watch-grid');
-            const loader = document.getElementById('loader');
+        // --- FUNCIÓN PARA OBTENER IMAGEN DE FONDO DEL GRUPO (Sin cambios) ---
+        function getGroupBackgroundImage(groupName) {
+            const groupImageMap = {
+                'Japon': 'Japon_grupo.jpg',
+                'Suiza': 'Suiza_grupo.jpg',
+                'China': 'China_grupo.jpg',
+                'India': 'India_grupo.jpg',
+                'Rusia': 'Rusia_grupo.jpg',
+                'Otros': 'Origen_otros_grupo.jpg'
+            };
+            const imageName = groupImageMap[groupName];
+            if (imageName) {
+                return `url('imagenes/grupo_galeria/${imageName}')`;
+            }
+            return null;
+        }
 
+
+        // --- LÓGICA DE AGRUPACIÓN ---
+
+        // Función 1: Agrupa los datos (Sin cambios)
+        function groupDataByKey(key) {
+            const grouped = watchesData.reduce((acc, watch) => {
+                const groupName = watch[key] || 'Otros'; 
+                if (!acc[groupName]) acc[groupName] = [];
+                acc[groupName].push(watch);
+                return acc;
+            }, {});
+            
+            return Object.keys(grouped).sort((a, b) => {
+                if (a === 'Otros') return 1;
+                if (b === 'Otros') return -1;
+                return a.localeCompare(b);
+            }).reduce((obj, key) => { 
+                obj[key] = grouped[key]; 
+                return obj; 
+            }, {});
+        }
+
+        // Función 2: Renderiza la vista de GRUPOS
+        function renderGroupView() {
+            currentView = 'groups';
+            const galleryContainer = document.getElementById('gallery-container');
+            const groupTitle = document.getElementById('group-title');
+            
+            // CAMBIO JS: Apuntar a 'filter-bar' en lugar de 'backBtn'
+            const filterBar = document.getElementById('filter-bar'); 
+
+            galleryContainer.innerHTML = ''; 
+            galleryContainer.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8'; 
+            
+            // CAMBIO JS: Ocultar 'filter-bar'
+            filterBar.classList.add('hidden'); 
+            groupTitle.classList.add('hidden'); 
+
+            const groups = groupDataByKey(currentGroupingKey);
+
+            if (Object.keys(groups).length === 0) {
+                 galleryContainer.innerHTML = `<p class="text-gray-700 col-span-1 sm:col-span-2 lg:col-span-3 text-center">No se encontraron relojes para agrupar.</p>`;
+                 return;
+            }
+
+            for (const groupName in groups) {
+                const items = groups[groupName];
+                const card = document.createElement('div');
+                card.dataset.groupName = groupName; 
+
+                const bgImageUrl = (currentGroupingKey === 'origin') ? getGroupBackgroundImage(groupName) : null;
+
+                if (bgImageUrl) {
+                    card.className = 'group-card group-card-image rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer p-6 text-center h-32 flex items-center justify-center';
+                    card.style.backgroundImage = bgImageUrl;
+                    card.innerHTML = `
+                        <div class="relative z-10">
+                            <h3 class="text-2xl font-bold text-white mb-2">${groupName}</h3>
+                            <p class="text-gray-200">${items.length} ${items.length === 1 ? 'reloj' : 'relojes'}</p>
+                        </div>
+                    `;
+                } else {
+                    card.className = 'group-card bg-[#ebe4cd] rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer p-6 text-center border border-[#ddcca6] h-32 flex flex-col items-center justify-center';
+                    card.innerHTML = `
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">${groupName}</h3>
+                        <p class="text-gray-700">${items.length} ${items.length === 1 ? 'reloj' : 'relojes'}</p>
+                    `;
+                }
+                galleryContainer.appendChild(card);
+            }
+        }
+
+        // Función 3: Renderiza la vista de ITEMS (relojes) de un grupo
+        function renderItemView(groupName) {
+            currentView = 'items';
+            const galleryContainer = document.getElementById('gallery-container');
+            const groupTitle = document.getElementById('group-title'); 
+            
+            // CAMBIO JS: Apuntar a 'filter-bar' en lugar de 'backBtn'
+            const filterBar = document.getElementById('filter-bar'); 
+
+            galleryContainer.innerHTML = ''; 
+            galleryContainer.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8'; 
+            
+            // CAMBIO JS: Mostrar 'filter-bar'
+            filterBar.classList.remove('hidden'); 
+            groupTitle.classList.remove('hidden'); 
+            groupTitle.textContent = `Mostrando relojes: ${groupName}`; 
+
+            const itemsInGroup = watchesData.filter(watch => {
+                const watchGroup = watch[currentGroupingKey] || 'Otros';
+                return watchGroup === groupName;
+            });
+
+            renderWatchCardsGrid(itemsInGroup); 
+        }
+
+        // Función 4: Crea las tarjetas de los relojes (Sin cambios)
+        async function renderWatchCardsGrid(watchesToRender) {
+            const galleryContainer = document.getElementById('gallery-container');
+
+            if (watchesToRender.length === 0) {
+                 galleryContainer.innerHTML = `<p class="text-gray-700 col-span-1 sm:col-span-2 lg:col-span-3 text-center">No se encontraron relojes en este grupo.</p>`;
+                 return;
+            }
+
+            for (const watch of watchesToRender) {
+                const card = document.createElement('div');
+                card.className = 'bg-[#ebe4cd] rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 relative border border-[#ddcca6]'; 
+                
+                const watchName = watch.name || "Nombre no disponible";
+                const watchShortDesc = watch.shortDesc || "Descripción no disponible.";
+                const watchPrice = watch.price || "Precio no disponible";
+                const mainImage = watch.mainImage || watch.mainimage;
+
+                const soldOverlay = watch.isSold ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center z-10"><span class="text-white text-2xl font-bold border-2 border-white py-2 px-4 rounded-md">VENDIDO</span></div>` : '';
+
+                card.innerHTML = `
+                    ${soldOverlay}
+                    <div class="relative h-72 bg-gray-400">
+                        <div class="img-loader"></div>
+                        <img class="w-full h-full object-cover hidden" data-src="${mainImage}" alt="${watchName}" /> 
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold text-gray-900 mb-2">${watchName}</h3>
+                        <p class="text-gray-700 mb-4">${watchShortDesc}</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-lg font-semibold text-gray-900">${watchPrice}</span>
+                            <button data-id="${watch.id}" class="view-details-btn bg-[#ddcca6] hover:bg-[#c9b78e] text-gray-900 font-semibold py-2 px-4 border border-transparent rounded-lg transition shadow-sm cursor-pointer">Ver Detalles</button>
+                        </div>
+                    </div>
+                `;
+                galleryContainer.appendChild(card);
+                
+                const imgElement = card.querySelector('img[data-src]');
+                const loaderElement = card.querySelector('.img-loader');
+                try {
+                    const url = await getSignedUrl(mainImage); 
+                    imgElement.src = url;
+                    imgElement.onload = () => {
+                        imgElement.classList.remove('hidden');
+                        if(loaderElement) loaderElement.style.display = 'none';
+                    };
+                    imgElement.onerror = () => {
+                         console.error(`Error: No se pudo cargar la imagen desde la URL firmada para ${watchName}.`);
+                         if(loaderElement) loaderElement.innerHTML = `<p class="text-xs text-red-600 p-2 text-center">Error al cargar imagen</p>`;
+                    }
+                } catch (e) {
+                     if(loaderElement) loaderElement.style.display = 'none';
+                }
+            }
+        }
+
+
+        // --- LÓGICA DE CARGA PRINCIPAL ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            const galleryContainer = document.getElementById('gallery-container');
+            const loader = document.getElementById('loader');
+            const groupBySelect = document.getElementById('group-by-select');
+            
+            // CAMBIO JS: Apuntar a 'filter-bar' en lugar de 'backBtn'
+            const filterBar = document.getElementById('filter-bar');
+            
             try {
+                // 1. Obtiene TODOS los relojes
                 const querySnapshot = await getDocs(collection(db, "wathces"));
 
                 if (querySnapshot.empty) {
                     loader.style.display = 'none';
-                    watchGrid.innerHTML = `<p class="text-yellow-700">No se encontraron relojes en la base de datos.</p>`;
+                    galleryContainer.innerHTML = `<p class="text-yellow-700">No se encontraron relojes en la base de datos.</p>`;
                     return; 
                 }
 
+                // 2. Guarda todos los relojes en la variable global
                 watchesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+                // 3. Oculta el loader principal y quita clases de centrado
                 loader.style.display = 'none';
-                watchGrid.classList.remove('flex', 'items-center', 'justify-center');
-                await renderWatches();
+                galleryContainer.classList.remove('flex', 'items-center', 'justify-center');
+                
+                // 4. Renderiza la vista inicial de grupos
+                renderGroupView();
+
+                // 5. Configura los Event Listeners
+                
+                // Listener para el SELECT de agrupar (sin cambios, ya tiene el 'if')
+                if (groupBySelect) {
+                    groupBySelect.addEventListener('change', (e) => {
+                        currentGroupingKey = e.target.value;
+                        renderGroupView(); 
+                    });
+                }
+
+                // CAMBIO JS: Añadir listener a 'filterBar' para delegar el clic del botón 'back-to-groups-btn'
+                filterBar.addEventListener('click', (e) => {
+                    if (e.target.closest('#back-to-groups-btn')) {
+                        renderGroupView();
+                    }
+                });
+
+                // Listener principal para la GALERÍA (sin cambios)
+                galleryContainer.addEventListener('click', (e) => {
+                    if (currentView === 'groups') {
+                        const groupCard = e.target.closest('.group-card');
+                        if (groupCard) {
+                            const groupName = groupCard.dataset.groupName;
+                            renderItemView(groupName);
+                        }
+                    } else if (currentView === 'items') {
+                        const detailsButton = e.target.closest('.view-details-btn');
+                        if (detailsButton) {
+                            const watchId = detailsButton.dataset.id;
+                            const selectedWatch = watchesData.find(w => w.id === watchId);
+                            if (selectedWatch) openModal(selectedWatch);
+                        }
+                    }
+                });
+
+
             } catch (error) {
                 console.error("Error CRÍTICO al obtener los relojes de Firestore: ", error);
                 loader.style.display = 'none';
-                watchGrid.innerHTML = `<p class="text-red-600">No se pudo cargar la colección. Revisa la consola para más detalles.</p>`;
+                galleryContainer.innerHTML = `<p class="text-red-600">No se pudo cargar la colección. Revisa la consola para más detalles.</p>`;
             }
+            
+            // --- LÓGICA DEL MODAL (Sin cambios) ---
 
-            // --- FUNCIÓN PARA CREAR TARJETAS ---
-            async function renderWatches() {
-                watchGrid.innerHTML = '';
-                for (const watch of watchesData) {
-                    const card = document.createElement('div');
-                    card.className = 'bg-[#ebe4cd] rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer relative border border-[#ddcca6]';
-                    
-                    const watchName = watch.name || "Nombre no disponible";
-                    const watchShortDesc = watch.shortDesc || "Descripción no disponible.";
-                    const watchPrice = watch.price || "Precio no disponible";
-                    const mainImage = watch.mainImage || watch.mainimage; // Maneja ambos casos por si acaso
-
-                    const soldOverlay = watch.isSold ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center"><span class="text-white text-2xl font-bold border-2 border-white py-2 px-4 rounded-md">VENDIDO</span></div>` : '';
-
-                    card.innerHTML = `
-                        <div class="relative h-72 bg-gray-400">
-                            <div class="img-loader"></div>
-                            <img class="w-full h-full object-cover hidden" data-src="${mainImage}" alt="${watchName}" /> 
-                            ${soldOverlay}
-                        </div>
-                        <div class="p-6">
-                            <h3 class="text-xl font-bold text-gray-900 mb-2">${watchName}</h3>
-                            <p class="text-gray-700 mb-4">${watchShortDesc}</p>
-                            <div class="flex justify-between items-center">
-                                <span class="text-lg font-semibold text-gray-900">${watchPrice}</span>
-                                <button data-id="${watch.id}" class="view-details-btn bg-[#ddcca6] hover:bg-[#c9b78e] text-gray-900 font-semibold py-2 px-4 border border-transparent rounded-lg transition shadow-sm">Ver Detalles</button>
-                            </div>
-                        </div>
-                    `;
-                    watchGrid.appendChild(card);
-                    
-                    const imgElement = card.querySelector('img[data-src]');
-                    const loaderElement = card.querySelector('.img-loader');
-                    try {
-                        // Importante: Usar mainImage que ya definimos arriba
-                        const url = await getSignedUrl(mainImage); 
-                        imgElement.src = url;
-                        imgElement.onload = () => {
-                            imgElement.classList.remove('hidden');
-                            if(loaderElement) loaderElement.style.display = 'none';
-                        };
-                        imgElement.onerror = () => {
-                             console.error(`Error: No se pudo cargar la imagen desde la URL firmada para ${watchName}.`);
-                             if(loaderElement) loaderElement.innerHTML = `<p class="text-xs text-red-600 p-2 text-center">Error al cargar imagen</p>`;
-                        }
-                    } catch (e) {
-                         if(loaderElement) loaderElement.style.display = 'none';
-                    }
-                }
-            }
-
-            // --- FUNCIÓN PARA ABRIR MODAL ---
             async function openModal(watch) {
                 const modalContent = document.getElementById('modal-content');
                 modalContent.innerHTML = `<div class="flex justify-center items-center p-8"><div class="loader"></div></div>`;
@@ -297,7 +499,6 @@
                     ? await Promise.all(watch.gallery.map(getSignedUrl)) 
                     : [];
                 
-                // Imágenes de la galería dentro del modal ahora son cuadradas y cubren el espacio.
                 const galleryHtml = galleryUrls.map(url => `
                     <div class="aspect-video"> <img src="${url}" alt="Vista de ${watch.name}" class="w-full h-full rounded-md object-cover border border-[#ddcca6]">
                     </div>
@@ -323,16 +524,6 @@
                     </div>
                 `;
             }
-
-            // --- EVENT LISTENERS ---
-             watchGrid.addEventListener('click', e => {
-                 const button = e.target.closest('.view-details-btn');
-                 if (button) {
-                     const watchId = button.dataset.id;
-                     const selectedWatch = watchesData.find(w => w.id === watchId);
-                     if (selectedWatch) openModal(selectedWatch);
-                 }
-            });
 
             document.getElementById('modal').addEventListener('click', e => {
                 if (e.target.id === 'modal' || e.target.closest('#close-modal-btn')) closeModal();

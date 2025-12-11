@@ -23,6 +23,7 @@
             background-color: #f7f3e8; /* Color base de papiro muy claro */
             color: #333; /* Texto principal oscuro */
         }
+        /* Animaciones de Modales */
         .modal-enter { animation: fadeIn 0.3s ease-out forwards; }
         .modal-leave { animation: fadeOut 0.3s ease-in forwards; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -31,6 +32,8 @@
         .modal-content-leave { animation: scaleDown 0.3s ease-in forwards; }
         @keyframes scaleUp { from { transform: scale(0.9) translateY(20px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
         @keyframes scaleDown { from { transform: scale(1) translateY(0); opacity: 1; } to { transform: scale(0.9) translateY(20px); opacity: 0;} }
+        
+        /* Loaders */
         .loader, .img-loader::before {
             content: '';
             box-sizing: border-box;
@@ -44,20 +47,21 @@
         .img-loader::before { width: 30px; height: 30px; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        /* Estilo para asegurar que el contenido de la sección esté sobre el fondo */
-        .section-content-wrapper {
-            position: relative;
-            z-index: 1;
-        }
-         /* Overlay sutil para las secciones con fondo */
-        .section-overlay::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            z-index: 0;
-        }
-        #about.section-overlay::before { background-color: rgba(247, 243, 232, 0.9); } /* bg-[#f7f3e8]/90 */
-        #collection.section-overlay::before { background-color: rgba(235, 228, 205, 0.9); } /* bg-[#ebe4cd]/90 */
+        /* Estilos generales de sección */
+        .section-content-wrapper { position: relative; z-index: 1; }
+        .section-overlay::before { content: ''; position: absolute; inset: 0; z-index: 0; }
+        #about.section-overlay::before { background-color: rgba(247, 243, 232, 0.9); }
+        #collection.section-overlay::before { background-color: rgba(235, 228, 205, 0.9); }
+
+        /* Estilos para tarjetas de grupo */
+        .group-card-image { background-size: cover; background-position: center; position: relative; }
+        .group-card-image::before { content: ''; position: absolute; inset: 0; background-color: rgba(0, 0, 0, 0.6); border-radius: 0.5rem; z-index: 0; }
+
+        /* NUEVOS ESTILOS PARA EL ZOOM */
+        .cursor-zoom-in { cursor: zoom-in; }
+        #zoom-modal { background-color: rgba(0, 0, 0, 0.95); } /* Fondo casi negro para el zoom */
+        #zoom-modal img { max-height: 90vh; max-width: 90vw; object-fit: contain; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .gallery-image-container:hover .hover-overlay { opacity: 1; }
 
     </style>
 </head>
@@ -86,7 +90,6 @@
         <section id="hero" class="relative h-[60vh] md:h-[80vh] flex items-center justify-center text-center overflow-hidden">
              <video autoplay loop muted playsinline class="absolute inset-0 w-full h-full object-cover -z-10">
                  <source src="video/test.mp4" type="video/mp4">
-                 Tu navegador no soporta el tag de video. Considera usar una imagen de fondo como fallback.
              </video>
              <div class="absolute inset-0 bg-black/50"></div>
              <div class="relative z-10 px-4">
@@ -115,7 +118,25 @@
                     <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Nuestra Colección</h2>
                     <p class="text-gray-700 mt-2">Piezas maestras de la relojería moderna y clásica.</p>
                 </div>
-                <div id="watch-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 min-h-[300px] flex items-center justify-center">
+
+                <div id="filter-bar" class="mb-8 p-6 bg-[#ebe4cd]/70 rounded-lg shadow-sm border border-[#ddcca6] flex flex-col sm:flex-row justify-between items-center gap-4 hidden">
+                    <div class="hidden"> 
+                        <label for="group-by-select" class="block text-sm font-medium text-gray-800 mb-1">Agrupar por:</label>
+                        <select id="group-by-select" class="rounded-md shadow-sm bg-white border-[#ddcca6] text-gray-900 focus:border-gray-500 focus:ring-gray-500">
+                            <option value="origin" selected>País de Origen</option>
+                            <option value="decade">Década</option>
+                            <option value="brand">Marca</option>
+                            <option value="type">Tipo</option>
+                        </select>
+                    </div>
+                    <button id="back-to-groups-btn" class="bg-[#ddcca6] hover:bg-[#c9b78e] text-gray-900 font-semibold py-2 px-4 border border-transparent rounded-lg transition shadow-sm">
+                        &larr; Volver a Grupos
+                    </button>
+                </div>
+                
+                <h3 id="group-title" class="text-2xl font-bold text-gray-900 text-center mb-8 hidden"></h3>
+                
+                <div id="gallery-container" class="min-h-[300px] flex items-center justify-center">
                     <div id="loader" class="loader"></div>
                 </div>
             </div>
@@ -125,9 +146,14 @@
             <div class="container mx-auto px-4 text-center">
                 <h2 class="text-3xl font-bold mb-4 text-gray-900">¿Interesado en una pieza?</h2>
                 <p class="text-gray-700 max-w-xl mx-auto mb-8">Contáctanos para consultas o para coordinar tu compra.</p>
-                <a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20uno%20de%20sus%20relojes." target="_blank" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center shadow-md">
-                    Contactar por WhatsApp
-                </a>
+                <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+                    <a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20uno%20de%20sus%20relojes." target="_blank" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center shadow-md w-full sm:w-auto">
+                        Contactar por WhatsApp
+                    </a>
+                    <a href="https://instagram.com/TU_USUARIO" target="_blank" class="bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 hover:opacity-90 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center shadow-md w-full sm:w-auto">
+                        Seguir en Instagram
+                    </a>
+                </div>
             </div>
         </section>
     </main>
@@ -139,17 +165,26 @@
     </footer>
 
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden modal-enter">
-        <div id="modal-content" class="bg-[#ddcca6] text-gray-900 rounded-lg shadow-xl w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto relative modal-content-enter"></div>
+        <div id="modal-content" class="bg-[#ddcca6] text-gray-900 rounded-lg shadow-xl w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto relative modal-content-enter scroll-smooth"></div>
     </div>
+
+    <div id="zoom-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden modal-enter" onclick="closeZoomModal()">
+        <div class="relative p-4">
+             <button class="absolute top-6 right-6 text-white bg-black/50 rounded-full p-2 hover:bg-black/80 transition z-10">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                 </svg>
+             </button>
+             <img id="zoomed-image" src="" alt="Zoomed view" class="rounded-lg modal-content-enter" onclick="event.stopPropagation()">
+         </div>
+    </div>
+
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
-        // --- PASO 1: Importación de App Check COMENTADA ---
-        // import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
-
-        // --- CONFIGURACIÓN DE FIREBASE ---
+        // --- CONFIGURACIÓN DE FIREBASE (Sin cambios) ---
         const firebaseConfig = {
             apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
             authDomain: "sbx-relojes-web.firebaseapp.com",
@@ -158,189 +193,241 @@
             messagingSenderId: "326032897645",
             appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
         };
-        
-        // --- URL DE TU CLOUD FUNCTION ---
         const getSignedUrlFunctionUrl = 'https://us-central1-sbx-relojes-web.cloudfunctions.net/getSignedUrl';
 
         const app = initializeApp(firebaseConfig);
-
-        // --- PASO 2: Inicialización de App Check COMENTADA ---
-        // const appCheck = initializeAppCheck(app, {
-        //    provider: new ReCaptchaEnterpriseProvider('6Lfadv0rAAAAADTYezhxnhJwzb47txP_koX54GD1'), 
-        //    isTokenAutoRefreshEnabled: true
-        // });
-
         const db = getFirestore(app, "relojes");
-        let watchesData = [];
+        let watchesData = []; 
         const signedUrlCache = new Map();
+        let currentGroupingKey = 'origin';
+        let currentView = 'groups';
 
-        // --- FUNCIÓN PARA OBTENER URL SEGURA Y TEMPORAL ---
+        // --- FUNCIÓN PARA OBTENER URL SEGURA (Sin cambios) ---
         async function getSignedUrl(filePath) {
             if (!filePath) {
-                console.error("Error: se intentó obtener URL para una ruta de archivo vacía.");
+                console.error("Error: Ruta de archivo vacía.");
                 return 'https://placehold.co/600x600/1a202c/ffffff?text=Ruta+no+especificada';
             }
-            if (signedUrlCache.has(filePath)) {
-                return signedUrlCache.get(filePath); 
-            }
+            if (signedUrlCache.has(filePath)) return signedUrlCache.get(filePath); 
             try {
-                // --- PASO 3: Lógica de token y headers COMENTADA ---
-                // let appCheckTokenResult;
-                // try {
-                //     appCheckTokenResult = await getToken(appCheck, /* forceRefresh= */ false);
-                // } catch (err) {
-                //     console.error("Error al obtener el token de App Check:", err);
-                //     throw new Error("Error de App Check");
-                // }
-
-                // Se llama a fetch SIN el objeto de headers
                 const response = await fetch(`${getSignedUrlFunctionUrl}?filePath=${encodeURIComponent(filePath)}`);
-
-                if (!response.ok) {
-                    console.error(`Error en la respuesta de la Cloud Function: ${response.status} - ${await response.text()}`);
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 signedUrlCache.set(filePath, data.url);
                 return data.url;
             } catch (error) {
-                console.error(`Error CRÍTICO al obtener URL firmada para '${filePath}':`, error);
+                console.error(`Error CRÍTICO obteniendo URL para '${filePath}':`, error);
                 return 'https://placehold.co/600x600/1a202c/ffffff?text=Error+al+cargar';
             }
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            const watchGrid = document.getElementById('watch-grid');
-            const loader = document.getElementById('loader');
+        // --- FUNCIÓN IMAGEN FONDO GRUPO (Sin cambios) ---
+        function getGroupBackgroundImage(groupName) {
+            const groupImageMap = { 'Japon': 'Japon_grupo.jpg', 'Suiza': 'Suiza_grupo.jpg', 'China': 'China_grupo.jpg', 'India': 'India_grupo.jpg', 'Rusia': 'Rusia_grupo.jpg', 'Otros': 'Origen_otros_grupo.jpg' };
+            const imageName = groupImageMap[groupName];
+            return imageName ? `url('imagenes/grupo_galeria/${imageName}')` : null;
+        }
 
+        // --- LÓGICA DE AGRUPACIÓN Y RENDERIZADO (Sin cambios) ---
+        function groupDataByKey(key) {
+            const grouped = watchesData.reduce((acc, watch) => {
+                const groupName = watch[key] || 'Otros'; 
+                if (!acc[groupName]) acc[groupName] = [];
+                acc[groupName].push(watch);
+                return acc;
+            }, {});
+            return Object.keys(grouped).sort((a, b) => {
+                if (a === 'Otros') return 1; if (b === 'Otros') return -1; return a.localeCompare(b);
+            }).reduce((obj, key) => { obj[key] = grouped[key]; return obj; }, {});
+        }
+
+        function renderGroupView() {
+            currentView = 'groups';
+            const galleryContainer = document.getElementById('gallery-container');
+            const groupTitle = document.getElementById('group-title');
+            const filterBar = document.getElementById('filter-bar'); 
+            galleryContainer.innerHTML = ''; 
+            galleryContainer.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8'; 
+            filterBar.classList.add('hidden'); 
+            groupTitle.classList.add('hidden'); 
+            const groups = groupDataByKey(currentGroupingKey);
+            if (Object.keys(groups).length === 0) { galleryContainer.innerHTML = `<p class="text-gray-700 col-span-3 text-center">No se encontraron relojes.</p>`; return; }
+            for (const groupName in groups) {
+                const items = groups[groupName];
+                const card = document.createElement('div');
+                card.dataset.groupName = groupName; 
+                const bgImageUrl = (currentGroupingKey === 'origin') ? getGroupBackgroundImage(groupName) : null;
+                if (bgImageUrl) {
+                    card.className = 'group-card group-card-image rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer p-6 text-center h-32 flex items-center justify-center';
+                    card.style.backgroundImage = bgImageUrl;
+                    card.innerHTML = `<div class="relative z-10"><h3 class="text-2xl font-bold text-white mb-2">${groupName}</h3><p class="text-gray-200">${items.length} ${items.length === 1 ? 'reloj' : 'relojes'}</p></div>`;
+                } else {
+                    card.className = 'group-card bg-[#ebe4cd] rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer p-6 text-center border border-[#ddcca6] h-32 flex flex-col items-center justify-center';
+                    card.innerHTML = `<h3 class="text-2xl font-bold text-gray-900 mb-2">${groupName}</h3><p class="text-gray-700">${items.length} ${items.length === 1 ? 'reloj' : 'relojes'}</p>`;
+                }
+                galleryContainer.appendChild(card);
+            }
+        }
+
+        function renderItemView(groupName) {
+            currentView = 'items';
+            const galleryContainer = document.getElementById('gallery-container');
+            const groupTitle = document.getElementById('group-title'); 
+            const filterBar = document.getElementById('filter-bar'); 
+            galleryContainer.innerHTML = ''; 
+            galleryContainer.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8'; 
+            filterBar.classList.remove('hidden'); 
+            groupTitle.classList.remove('hidden'); 
+            groupTitle.textContent = `Mostrando relojes: ${groupName}`; 
+            const itemsInGroup = watchesData.filter(watch => (watch[currentGroupingKey] || 'Otros') === groupName);
+            renderWatchCardsGrid(itemsInGroup); 
+        }
+
+        async function renderWatchCardsGrid(watchesToRender) {
+            const galleryContainer = document.getElementById('gallery-container');
+            if (watchesToRender.length === 0) { galleryContainer.innerHTML = `<p class="text-gray-700 col-span-3 text-center">No hay relojes en este grupo.</p>`; return; }
+            for (const watch of watchesToRender) {
+                const card = document.createElement('div');
+                card.className = 'bg-[#ebe4cd] rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 relative border border-[#ddcca6]'; 
+                const mainImage = watch.mainImage || watch.mainimage;
+                const soldOverlay = watch.isSold ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center z-10"><span class="text-white text-2xl font-bold border-2 border-white py-2 px-4 rounded-md">VENDIDO</span></div>` : '';
+                card.innerHTML = `${soldOverlay}<div class="relative h-72 bg-gray-400"><div class="img-loader"></div><img class="w-full h-full object-cover hidden" data-src="${mainImage}" alt="${watch.name || 'Reloj'}" /></div><div class="p-6"><h3 class="text-xl font-bold text-gray-900 mb-2">${watch.name || 'Sin nombre'}</h3><p class="text-gray-700 mb-4">${watch.shortDesc || 'Sin descripción.'}</p><div class="flex justify-between items-center"><span class="text-lg font-semibold text-gray-900">${watch.price || ''}</span><button data-id="${watch.id}" class="view-details-btn bg-[#ddcca6] hover:bg-[#c9b78e] text-gray-900 font-semibold py-2 px-4 border border-transparent rounded-lg transition shadow-sm cursor-pointer">Ver Detalles</button></div></div>`;
+                galleryContainer.appendChild(card);
+                const imgElement = card.querySelector('img[data-src]');
+                const loaderElement = card.querySelector('.img-loader');
+                try {
+                    const url = await getSignedUrl(mainImage); 
+                    imgElement.src = url;
+                    imgElement.onload = () => { imgElement.classList.remove('hidden'); if(loaderElement) loaderElement.style.display = 'none'; };
+                    imgElement.onerror = () => { if(loaderElement) loaderElement.innerHTML = `<p class="text-xs text-red-600 p-2 text-center">Error</p>`; }
+                } catch (e) { if(loaderElement) loaderElement.style.display = 'none'; }
+            }
+        }
+
+
+        // --- LÓGICA DE CARGA PRINCIPAL ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            const galleryContainer = document.getElementById('gallery-container');
+            const loader = document.getElementById('loader');
+            const groupBySelect = document.getElementById('group-by-select');
+            const filterBar = document.getElementById('filter-bar');
+            
             try {
                 const querySnapshot = await getDocs(collection(db, "wathces"));
-
-                if (querySnapshot.empty) {
-                    loader.style.display = 'none';
-                    watchGrid.innerHTML = `<p class="text-yellow-700">No se encontraron relojes en la base de datos.</p>`;
-                    return; 
-                }
-
+                if (querySnapshot.empty) { loader.style.display = 'none'; galleryContainer.innerHTML = `<p class="text-yellow-700">No hay relojes.</p>`; return; }
                 watchesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
                 loader.style.display = 'none';
-                watchGrid.classList.remove('flex', 'items-center', 'justify-center');
-                await renderWatches();
-            } catch (error) {
-                console.error("Error CRÍTICO al obtener los relojes de Firestore: ", error);
-                loader.style.display = 'none';
-                watchGrid.innerHTML = `<p class="text-red-600">No se pudo cargar la colección. Revisa la consola para más detalles.</p>`;
-            }
+                galleryContainer.classList.remove('flex', 'items-center', 'justify-center');
+                renderGroupView();
 
-            // --- FUNCIÓN PARA CREAR TARJETAS ---
-            async function renderWatches() {
-                watchGrid.innerHTML = '';
-                for (const watch of watchesData) {
-                    const card = document.createElement('div');
-                    card.className = 'bg-[#ebe4cd] rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer relative border border-[#ddcca6]';
-                    
-                    const watchName = watch.name || "Nombre no disponible";
-                    const watchShortDesc = watch.shortDesc || "Descripción no disponible.";
-                    const watchPrice = watch.price || "Precio no disponible";
-                    const mainImage = watch.mainImage || watch.mainimage; // Maneja ambos casos por si acaso
-
-                    const soldOverlay = watch.isSold ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center"><span class="text-white text-2xl font-bold border-2 border-white py-2 px-4 rounded-md">VENDIDO</span></div>` : '';
-
-                    card.innerHTML = `
-                        <div class="relative h-72 bg-gray-400">
-                            <div class="img-loader"></div>
-                            <img class="w-full h-full object-cover hidden" data-src="${mainImage}" alt="${watchName}" /> 
-                            ${soldOverlay}
-                        </div>
-                        <div class="p-6">
-                            <h3 class="text-xl font-bold text-gray-900 mb-2">${watchName}</h3>
-                            <p class="text-gray-700 mb-4">${watchShortDesc}</p>
-                            <div class="flex justify-between items-center">
-                                <span class="text-lg font-semibold text-gray-900">${watchPrice}</span>
-                                <button data-id="${watch.id}" class="view-details-btn bg-[#ddcca6] hover:bg-[#c9b78e] text-gray-900 font-semibold py-2 px-4 border border-transparent rounded-lg transition shadow-sm">Ver Detalles</button>
-                            </div>
-                        </div>
-                    `;
-                    watchGrid.appendChild(card);
-                    
-                    const imgElement = card.querySelector('img[data-src]');
-                    const loaderElement = card.querySelector('.img-loader');
-                    try {
-                        // Importante: Usar mainImage que ya definimos arriba
-                        const url = await getSignedUrl(mainImage); 
-                        imgElement.src = url;
-                        imgElement.onload = () => {
-                            imgElement.classList.remove('hidden');
-                            if(loaderElement) loaderElement.style.display = 'none';
-                        };
-                        imgElement.onerror = () => {
-                             console.error(`Error: No se pudo cargar la imagen desde la URL firmada para ${watchName}.`);
-                             if(loaderElement) loaderElement.innerHTML = `<p class="text-xs text-red-600 p-2 text-center">Error al cargar imagen</p>`;
+                if (groupBySelect) { groupBySelect.addEventListener('change', (e) => { currentGroupingKey = e.target.value; renderGroupView(); }); }
+                filterBar.addEventListener('click', (e) => { if (e.target.closest('#back-to-groups-btn')) renderGroupView(); });
+                galleryContainer.addEventListener('click', (e) => {
+                    if (currentView === 'groups') {
+                        const groupCard = e.target.closest('.group-card');
+                        if (groupCard) renderItemView(groupCard.dataset.groupName);
+                    } else if (currentView === 'items') {
+                        const detailsButton = e.target.closest('.view-details-btn');
+                        if (detailsButton) {
+                            const selectedWatch = watchesData.find(w => w.id === detailsButton.dataset.id);
+                            if (selectedWatch) openModal(selectedWatch);
                         }
-                    } catch (e) {
-                         if(loaderElement) loaderElement.style.display = 'none';
                     }
-                }
-            }
+                });
 
-            // --- FUNCIÓN PARA ABRIR MODAL ---
+            } catch (error) { console.error("Error CRÍTICO:", error); loader.style.display = 'none'; galleryContainer.innerHTML = `<p class="text-red-600">Error al cargar.</p>`; }
+            
+            // --- LÓGICA DEL MODAL DE DETALLES (ACTUALIZADA: BOTÓN GALERÍA Y SCROLL) ---
+
             async function openModal(watch) {
                 const modalContent = document.getElementById('modal-content');
-                modalContent.innerHTML = `<div class="flex justify-center items-center p-8"><div class="loader"></div></div>`;
+                modalContent.innerHTML = `<div class="flex justify-center items-center p-8 h-64"><div class="loader"></div></div>`;
                 
                 const modal = document.getElementById('modal');
                 modal.classList.remove('hidden');
                 document.body.style.overflow = 'hidden';
 
-                const galleryUrls = watch.gallery && Array.isArray(watch.gallery) 
-                    ? await Promise.all(watch.gallery.map(getSignedUrl)) 
-                    : [];
-                
-                // Imágenes de la galería dentro del modal ahora son cuadradas y cubren el espacio.
-                const galleryHtml = galleryUrls.map(url => `
-                    <div class="aspect-video"> <img src="${url}" alt="Vista de ${watch.name}" class="w-full h-full rounded-md object-cover border border-[#ddcca6]">
+                let allImagePaths = [];
+                const mainImgPath = watch.mainImage || watch.mainimage;
+                if (mainImgPath) allImagePaths.push(mainImgPath);
+                if (watch.gallery && Array.isArray(watch.gallery)) {
+                    const galleryPaths = watch.gallery.filter(path => path !== mainImgPath);
+                    allImagePaths = allImagePaths.concat(galleryPaths);
+                }
+                const allImageUrls = await Promise.all(allImagePaths.map(getSignedUrl));
+
+                const galleryHtml = allImageUrls.map((url, index) => `
+                    <div class="aspect-video cursor-zoom-in group rounded-md overflow-hidden border border-[#ddcca6] relative gallery-image-container shadow-sm">
+                        <img src="${url}" alt="Vista ${index + 1} de ${watch.name}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                        <div class="hover-overlay absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 transition-opacity duration-300 pointer-events-none">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                             </svg>
+                        </div>
                     </div>
                 `).join(''); 
                 
-                const videoHtml = watch.videoUrl ? `<div class="mt-6"><h4 class="text-xl font-semibold mb-2 text-gray-900">Video</h4><div class="aspect-w-16 aspect-h-9"><iframe class="rounded-lg border border-[#ddcca6]" src="${watch.videoUrl}" frameborder="0" allowfullscreen></iframe></div></div>` : '';
-                const buyButton = watch.isSold ? `<div class="w-full bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg text-center shadow-md">Vendido</div>` : `<a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20el%20reloj%20${encodeURIComponent(watch.name)}." target="_blank" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition inline-flex items-center justify-center shadow-md">Comprar por WhatsApp</a>`;
+                const videoHtml = watch.videoUrl ? `<div class="mt-6 pt-6 border-t border-[#ddcca6]/50"><h4 class="text-xl font-semibold mb-4 text-gray-900 flex items-center"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Video del Reloj</h4><div class="aspect-w-16 aspect-h-9shadow-sm"><iframe class="rounded-lg border border-[#ddcca6]" src="${watch.videoUrl}" frameborder="0" allowfullscreen></iframe></div></div>` : '';
+                const buyButton = watch.isSold ? `<div class="w-full bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg text-center shadow-md uppercase tracking-wider">Vendido</div>` : `<a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20el%20reloj%20${encodeURIComponent(watch.name)}." target="_blank" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition inline-flex items-center justify-center shadow-md hover:shadow-lg">Comprar por WhatsApp</a>`;
 
+                // --- CAMBIOS EN ESTA SECCIÓN ---
                 modalContent.innerHTML = `
-                    <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-700 hover:text-gray-900 z-10">
+                    <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-700 hover:text-gray-900 z-20 bg-white/80 backdrop-blur rounded-full p-1 hover:bg-white transition shadow-sm">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
+                    
                     <div class="p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="relative bg-[#f7f3e8]/80 rounded-lg p-6" style="background-image: url('imagenes/logo_full.svg'); background-size: contain; background-repeat: no-repeat; background-position: center;">
-                            <div class="absolute inset-0 bg-[#f7f3e8]/70 rounded-lg"></div> <div class="relative z-10">
-                                <h3 class="text-3xl font-bold text-gray-900 mb-4">${watch.name || "Sin nombre"}</h3>
-                                <p class="text-gray-700 mb-6">${watch.longDesc || "Sin descripción."}</p>
-                                <span class="text-2xl font-bold text-gray-900 block mb-6">${watch.price || "Sin precio"}</span>
-                                ${buyButton}
+                        <div class="relative bg-[#f7f3e8] rounded-lg p-6 overflow-hidden shadow-inner border border-[#ddcca6]">
+                            <div class="absolute inset-0 z-0 opacity-[0.07] pointer-events-none mix-blend-multiply" 
+                                style="background-image: url('imagenes/logo_full.svg'); background-size: contain; background-repeat: no-repeat; background-position: center;">
+                            </div>
+
+                            <div class="relative z-10">
+                                
+                                <div class="flex flex-col sm:flex-row justify-between items-start gap-3 mb-5 border-b-2 border-[#ddcca6] pb-3">
+                                    <h3 class="text-3xl font-bold text-gray-900 font-serif leading-tight">${watch.name || "Sin nombre"}</h3>
+                                    
+                                    <button onclick="document.getElementById('gallery-section').scrollIntoView({ behavior: 'smooth' })" 
+                                            class="shrink-0 text-sm bg-white/60 hover:bg-[#ddcca6] border border-[#ddcca6] text-gray-800 px-3 py-1.5 rounded-full transition flex items-center gap-2 cursor-pointer shadow-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        Ver Galería
+                                    </button>
+                                </div>
+
+                                <p class="text-gray-800 mb-8 text-base leading-relaxed text-justify font-medium pr-2">
+                                    ${watch.longDesc || "Sin descripción."}
+                                </p>
+                                <div class="mt-4 p-5 bg-[#ebe4cd]/60 rounded-lg border border-[#ddcca6] shadow-sm mb-6">
+                                    <span class="text-xs text-gray-600 uppercase tracking-widest block mb-1 font-semibold">Precio</span>
+                                    <span class="text-3xl font-bold text-gray-900">${watch.price || "Consultar"}</span>
+                                </div>
+                                <div>${buyButton}</div>
                             </div>
                         </div>
-                        <div class="space-y-4">${galleryHtml}${videoHtml}</div>
+
+                        <div id="gallery-section" class="space-y-6 pt-2">
+                            <h4 class="text-xl font-semibold text-gray-900 mb-4 flex items-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Galería de Imágenes <span class="text-sm font-normal text-gray-500 ml-2">(Clic para ampliar)</span></h4>
+                            <div class="grid grid-cols-1 gap-4" id="modal-gallery-grid">
+                                ${galleryHtml}
+                            </div>
+                            ${videoHtml}
+                        </div>
                     </div>
                 `;
+
+                const galleryImages = modalContent.querySelectorAll('.gallery-image-container img');
+                galleryImages.forEach(img => {
+                    img.addEventListener('click', () => {
+                        openZoomModal(img.getAttribute('src'));
+                    });
+                });
             }
 
-            // --- EVENT LISTENERS ---
-             watchGrid.addEventListener('click', e => {
-                 const button = e.target.closest('.view-details-btn');
-                 if (button) {
-                     const watchId = button.dataset.id;
-                     const selectedWatch = watchesData.find(w => w.id === watchId);
-                     if (selectedWatch) openModal(selectedWatch);
-                 }
-            });
-
-            document.getElementById('modal').addEventListener('click', e => {
-                if (e.target.id === 'modal' || e.target.closest('#close-modal-btn')) closeModal();
-            });
-            
-            document.addEventListener('keydown', e => {
-                if (e.key === 'Escape' && !document.getElementById('modal').classList.contains('hidden')) closeModal();
-            });
+            // Listeners para cerrar el modal principal
+            document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('#close-modal-btn')) closeModal(); });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!document.getElementById('zoom-modal').classList.contains('hidden')) { closeZoomModal(); } else if (!document.getElementById('modal').classList.contains('hidden')) { closeModal(); }} });
 
             function closeModal() {
                 const modal = document.getElementById('modal');
@@ -355,6 +442,24 @@
                 }, { once: true });
             }
         });
+
+        // --- FUNCIONES GLOBALES PARA EL ZOOM ---
+        window.openZoomModal = (url) => {
+            const zoomModal = document.getElementById('zoom-modal');
+            const zoomedImage = document.getElementById('zoomed-image');
+            zoomedImage.src = url;
+            zoomModal.classList.remove('hidden');
+        }
+
+        window.closeZoomModal = () => {
+             const zoomModal = document.getElementById('zoom-modal');
+             zoomModal.classList.add('modal-leave');
+             zoomModal.addEventListener('animationend', () => {
+                zoomModal.classList.add('hidden');
+                zoomModal.classList.remove('modal-leave');
+                document.getElementById('zoomed-image').src = ''; // Limpiar src
+            }, { once: true });
+        }
     </script>
 </body>
 </html>
