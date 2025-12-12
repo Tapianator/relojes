@@ -45,7 +45,6 @@
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { 
@@ -127,8 +126,15 @@
         const imageModalContent = document.getElementById('image-modal-content');
         const imageModalLoader = document.getElementById('image-modal-loader');
         const imageGrid = document.getElementById('image-grid');
+        
+        // Elementos Uploader Galería
         const imageUploader = document.getElementById('image-uploader');
         const uploadSpinner = document.getElementById('upload-spinner');
+        
+        // NUEVOS: Elementos Uploader Imagen Principal
+        const mainImageUploader = document.getElementById('main-image-uploader');
+        const mainUploadSpinner = document.getElementById('main-upload-spinner');
+
         let currentEditDocId = null; 
         let currentEditFolder = null; 
 
@@ -264,12 +270,10 @@
             document.getElementById('edit-videoUrl').value = watch.videoUrl || '';
             document.getElementById('edit-isSold').checked = watch.isSold || false;
 
-            // --- INICIO: Cargar datos en nuevos selects ---
             document.getElementById('edit-brand').value = watch.brand || '';
             document.getElementById('edit-origin').value = watch.origin || '';
             document.getElementById('edit-type').value = watch.type || '';
             document.getElementById('edit-decade').value = watch.decade || '';
-            // --- FIN: Cargar datos en nuevos selects ---
 
             editModal.classList.remove('hidden');
             editModal.classList.add('modal-enter');
@@ -305,13 +309,10 @@
                 longDesc: document.getElementById('edit-longDesc').value,
                 videoUrl: document.getElementById('edit-videoUrl').value,
                 isSold: document.getElementById('edit-isSold').checked,
-
-                // --- INICIO: Guardar datos de nuevos selects ---
                 brand: document.getElementById('edit-brand').value,
                 origin: document.getElementById('edit-origin').value,
                 type: document.getElementById('edit-type').value,
                 decade: document.getElementById('edit-decade').value
-                // --- FIN: Guardar datos de nuevos selects ---
             };
 
             try {
@@ -362,7 +363,6 @@
         deleteConfirmButton.addEventListener('click', async () => {
             if (currentDeleteId) {
                 try {
-                    // TODO: Borrar también las imágenes de Storage
                     const docRef = doc(db, "wathces", currentDeleteId);
                     await deleteDoc(docRef);
                     currentDeleteId = null;
@@ -399,11 +399,13 @@
             const galleryPaths = watch.gallery || [];
             currentEditFolder = mainImagePath ? mainImagePath.split('/')[0] : 'default';
             
-            const allImagePaths = [...new Set([mainImagePath, ...galleryPaths])];
+            // Combinar para mostrar miniaturas, pero distinguiremos cuál es cuál
+            const allImagePaths = [...new Set([mainImagePath, ...galleryPaths])].filter(p => p);
 
             if (allImagePaths.length === 0) {
-                 imageGrid.innerHTML = `<p class="text-gray-500">No hay imágenes para este reloj.</p>`;
+                 imageGrid.innerHTML = `<p class="text-gray-500 col-span-full text-center">No hay imágenes cargadas.</p>`;
                  imageModalLoader.classList.add('hidden');
+                 // Permitimos ver el modal vacío para que pueda subir imágenes
                  return;
             }
 
@@ -429,16 +431,16 @@
 
         function createImageThumbnail(path, url, isMain) {
             const div = document.createElement('div');
-            div.className = `relative group rounded-md overflow-hidden border-2 ${isMain ? 'border-blue-600' : 'border-transparent'}`;
+            div.className = `relative group rounded-md overflow-hidden border-4 ${isMain ? 'border-blue-600 shadow-md' : 'border-transparent shadow-sm'}`;
             
-            const mainBadge = isMain ? `<span class="absolute top-1 left-1 bg-blue-600 text-white text-xs font-medium px-2 py-0.5 rounded">Principal</span>` : '';
+            const mainBadge = isMain ? `<span class="absolute top-1 left-1 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded shadow-sm z-10">PRINCIPAL</span>` : '';
 
             div.innerHTML = `
                 <img src="${url}" alt="${path}" class="h-40 w-full object-cover">
                 ${mainBadge}
-                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center space-y-1 p-2">
-                    <button data-path="${path}" class="set-main-btn text-xs bg-white text-black px-2 py-1 rounded-md hover:bg-gray-200 ${isMain ? 'hidden' : ''}">Usar como Principal</button>
-                    <button data-path="${path}" class="delete-image-btn text-xs bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700">Borrar</button>
+                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center space-y-2 p-2">
+                    <button data-path="${path}" class="set-main-btn text-xs bg-white text-gray-900 px-3 py-1.5 rounded font-medium hover:bg-gray-100 ${isMain ? 'hidden' : ''}">Usar como Principal</button>
+                    <button data-path="${path}" class="delete-image-btn text-xs bg-red-600 text-white px-3 py-1.5 rounded font-medium hover:bg-red-700">Borrar</button>
                 </div>
             `;
             return div;
@@ -470,7 +472,7 @@
             }
             if (deleteBtn) {
                 const path = deleteBtn.dataset.path;
-                if (confirm(`¿Estás seguro de que quieres borrar la imagen ${path}? Esta acción no se puede deshacer.`)) {
+                if (confirm(`¿Estás seguro de que quieres borrar la imagen?`)) {
                      await deleteImage(path);
                 }
             }
@@ -493,6 +495,7 @@
                 await deleteObject(imgRef);
                 
                 const docRef = doc(db, "wathces", currentEditDocId);
+                // Intentamos borrar de ambos lados por si acaso
                 await updateDoc(docRef, {
                     gallery: arrayRemove(path) 
                 });
@@ -509,6 +512,7 @@
             }
         }
 
+        // --- SUBIR IMÁGENES A LA GALERÍA ---
         imageUploader.addEventListener('change', async (e) => {
             const files = e.target.files;
             if (files.length === 0) return;
@@ -544,9 +548,41 @@
             }
         });
 
+        // --- NUEVO: SUBIR/CAMBIAR IMAGEN PRINCIPAL ---
+        mainImageUploader.addEventListener('change', async (e) => {
+            const file = e.target.files[0]; // Solo permitimos un archivo a la vez
+            if (!file) return;
+
+            mainUploadSpinner.classList.remove('hidden');
+
+            try {
+                // Usamos una convención de nombre para evitar caché o sobreescritura accidental
+                const newPath = `${currentEditFolder}/main_${Date.now()}_${file.name}`;
+                const imgRef = ref(storage, newPath);
+                
+                // 1. Subir la imagen
+                await uploadBytes(imgRef, file);
+
+                // 2. Actualizar el campo mainImage en Firestore
+                const docRef = doc(db, "wathces", currentEditDocId);
+                await updateDoc(docRef, {
+                    mainImage: newPath
+                });
+
+                // 3. Recargar el modal para ver el cambio
+                await openImageModal(currentEditDocId);
+
+            } catch (error) {
+                console.error("Error al subir imagen principal:", error);
+                alert("Error al subir la imagen principal.");
+            } finally {
+                mainUploadSpinner.classList.add('hidden');
+                mainImageUploader.value = '';
+            }
+        });
+
     </script>
 
-    <!-- Sección de Login (Ahora es funcional) -->
     <div id="login-section" class="flex items-center justify-center min-h-screen bg-gray-900">
         <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-center text-gray-900">Iniciar Sesión - Admin</h2>
@@ -567,7 +603,6 @@
         </div>
     </div>
 
-    <!-- Sección de Administración (Oculta por defecto) -->
     <div id="admin-section" class="hidden">
         <header class="bg-white shadow-md sticky top-0 z-30">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -596,13 +631,11 @@
                 </div>
 
                 <div id="watch-list-container" class="space-y-4">
-                    <!-- Los relojes se cargarán aquí -->
-                </div>
+                    </div>
             </div>
         </main>
     </div>
 
-    <!-- Modal de Edición (TEXTO) -->
     <div id="edit-modal" class="fixed inset-0 z-40 flex items-center justify-center bg-black/70 hidden p-4">
         <div id="edit-modal-content" class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
             <button id="modal-close-btn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
@@ -624,7 +657,6 @@
                     </div>
                 </div>
 
-                <!-- --- INICIO: NUEVOS CAMPOS DE GRUPO --- -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label for="edit-brand" class="block text-sm font-medium text-gray-700">Marca</label>
@@ -680,7 +712,6 @@
                         </select>
                     </div>
                 </div>
-                <!-- --- FIN: NUEVOS CAMPOS DE GRUPO --- -->
 
                 <div>
                     <label for="edit-folder" class="block text-sm font-medium text-gray-700">Carpeta en Storage (Solo lectura)</label>
@@ -717,7 +748,6 @@
         </div>
     </div>
 
-    <!-- Modal de Confirmación de Borrado (RELOJ) -->
     <div id="delete-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 hidden p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div class="p-6">
@@ -735,7 +765,6 @@
         </div>
     </div>
 
-    <!-- NUEVO: Modal de Administración de Imágenes -->
     <div id="image-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 hidden p-4">
         <div id="image-modal-content" class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
             <button id="image-modal-close-btn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
@@ -745,10 +774,33 @@
             <div class="p-8">
                 <h3 class="text-2xl font-bold text-gray-900 mb-6">Administrar Imágenes</h3>
                 
-                <div class="mb-4 p-4 bg-gray-50 rounded-md border">
-                    <label for="image-uploader" class="block text-sm font-medium text-gray-700 mb-2">Subir nuevas imágenes a la galería</label>
+                <div class="mb-6 p-5 bg-blue-50 rounded-lg border border-blue-200">
+                    <label for="main-image-uploader" class="block text-base font-semibold text-blue-800 mb-2">
+                        <svg class="w-5 h-5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        Cambiar Imagen Principal (Portada)
+                    </label>
+                    <p class="text-sm text-blue-600 mb-3">Sube una nueva foto aquí y se establecerá automáticamente como la imagen principal del reloj.</p>
+                    <div class="flex items-center space-x-3">
+                        <input type="file" id="main-image-uploader" accept="image/*" class="block w-full text-sm text-slate-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-blue-600 file:text-white
+                          hover:file:bg-blue-700
+                        ">
+                        <div id="main-upload-spinner" class="spinner-small hidden text-blue-600"></div>
+                    </div>
+                </div>
+
+                <div class="mb-4 p-5 bg-gray-50 rounded-lg border border-gray-200">
+                    <label for="image-uploader" class="block text-sm font-medium text-gray-700 mb-2">Subir imágenes adicionales a la galería</label>
                     <div class="flex items-center space-x-2">
-                        <input type="file" id="image-uploader" accept="image/*" multiple class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        <input type="file" id="image-uploader" accept="image/*" multiple class="block w-full text-sm text-slate-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-gray-200 file:text-gray-700
+                          hover:file:bg-gray-300">
                         <div id="upload-spinner" class="spinner-small hidden"></div>
                     </div>
                 </div>
@@ -759,12 +811,10 @@
                 </div>
                 
                 <div id="image-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    <!-- Las imágenes se cargarán aquí -->
-                </div>
+                    </div>
             </div>
         </div>
     </div>
 
 </body>
 </html>
-

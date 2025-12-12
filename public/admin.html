@@ -23,7 +23,6 @@
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { 
@@ -32,21 +31,40 @@
             signInWithEmailAndPassword, 
             signOut,
             setPersistence,
-            browserSessionPersistence // <-- CAMBIADO
+            browserSessionPersistence 
         } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
         import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
 
-        // --- CONFIGURACIÓN DE FIREBASE ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OC8PG4ClleCxQ",
-            authDomain: "sbx-relojes-web.firebaseapp.com",
-            projectId: "sbx-relojes-web",
-            storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c", 
-            messagingSenderId: "326032897645",
-            appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
-        };
+        // --- CONFIGURACIÓN DE FIREBASE INTELIGENTE (AUTO-DETECT) ---
+        let firebaseConfig;
+        
+        // 1. Detectamos si estamos en Localhost (Entorno de Desarrollo/Sandbox Local)
+        if (window.location.hostname === "localhost" || window.location.hostname.includes("127.0.0.1") || window.location.hostname.includes("192.168")) {
+            console.log("🛠️ Admin: Modo Desarrollo Local detectado (SBX)");
+            
+            // Credenciales de SANDBOX (Las que ya tenías funcionando)
+            firebaseConfig = {
+                apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OC8PG4ClleCxQ",
+                authDomain: "sbx-relojes-web.firebaseapp.com",
+                projectId: "sbx-relojes-web",
+                storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c", 
+                messagingSenderId: "326032897645",
+                appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
+            };
+        } else {
+            // 2. Modo Nube (Desplegado en Hosting)
+            console.log("☁️ Admin: Modo Nube detectado. Obteniendo configuración...");
+            try {
+                const response = await fetch('/__/firebase/init.json');
+                if (!response.ok) throw new Error("No se pudo cargar la configuración de Firebase");
+                firebaseConfig = await response.json();
+                console.log(`🚀 Admin conectado al proyecto: ${firebaseConfig.projectId}`);
+            } catch (e) {
+                console.error("Error CRÍTICO obteniendo configuración automática:", e);
+            }
+        }
         
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -75,7 +93,7 @@
         const formMessage = document.getElementById('form-message');
 
         // --- LÓGICA DE AUTENTICACIÓN ---
-        setPersistence(auth, browserSessionPersistence) // <-- CAMBIADO
+        setPersistence(auth, browserSessionPersistence) 
             .then(() => {
                 console.log("Persistencia de sesión configurada.");
             })
@@ -112,7 +130,7 @@
             signOut(auth);
         });
 
-        // --- LÓGICA DE GUARDAR RELOJ (MODIFICADA) ---
+        // --- LÓGICA DE GUARDAR RELOJ ---
         saveWatchForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             formMessage.classList.add('hidden');
@@ -138,15 +156,18 @@
             const longDesc = document.getElementById('longDesc').value;
             const videoUrl = document.getElementById('videoUrl').value;
             const isSold = document.getElementById('isSold').checked;
+            
+            // --- NUEVO: Captura de Oculto ---
+            const isHidden = document.getElementById('isHidden').checked;
+
             const mainImageFile = document.getElementById('mainImage').files[0];
             const galleryFiles = document.getElementById('gallery').files;
 
-            // --- INICIO: Captura de nuevos campos ---
+            // --- Captura de nuevos campos ---
             const brand = document.getElementById('brand').value;
             const origin = document.getElementById('origin').value;
             const type = document.getElementById('type').value;
             const decade = document.getElementById('decade').value;
-            // --- FIN: Captura de nuevos campos ---
 
 
             if (!mainImageFile || !storageFolder) {
@@ -173,7 +194,7 @@
                 }
                 console.log(`DEBUG: Imágenes de galería subidas:`, galleryPaths);
 
-                // 3. Preparar datos para Firestore (MODIFICADO)
+                // 3. Preparar datos para Firestore
                 const watchData = {
                     name: watchName,
                     price: watchPrice,
@@ -181,15 +202,16 @@
                     longDesc: longDesc,
                     videoUrl: videoUrl,
                     isSold: isSold,
+                    
+                    // Guardamos el estado de oculto
+                    isHidden: isHidden,
+
                     mainImage: mainImagePath, 
                     gallery: galleryPaths,
-
-                    // --- INICIO: Nuevos campos añadidos ---
                     brand: brand,
                     origin: origin,
                     type: type,
                     decade: decade
-                    // --- FIN: Nuevos campos añadidos ---
                 };
 
                 // 4. Guardar en Firestore
@@ -204,13 +226,12 @@
                 console.error("--- DEBUG: ERROR CRÍTICO AL GUARDAR EL RELOJ ---");
                 console.error("Código de Error:", error.code); 
                 console.error("Mensaje de Error:", error.message);
-                console.error("Objeto de Error Completo:", error);
                 
                 let friendlyMessage = "Error al subir el reloj. Revisa la consola para más detalles.";
                 if (error.code === 'storage/unauthorized') {
-                    friendlyMessage = "Error: Permiso denegado por Storage. Asegúrate de que las Reglas de Storage (Paso 5) y la configuración de CORS (Paso 3) de la guía estén aplicadas.";
+                    friendlyMessage = "Error: Permiso denegado por Storage.";
                 } else if (error.code === 'permission-denied') {
-                     friendlyMessage = "Error: Permiso denegado por Firestore. Asegúrate de que las Reglas de Firestore (Paso 4) estén aplicadas.";
+                     friendlyMessage = "Error: Permiso denegado por Firestore.";
                 }
                 showMessage(friendlyMessage, true);
             } finally {
@@ -241,7 +262,6 @@
 
     </script>
 
-    <!-- Sección de Login -->
     <div id="login-section" class="flex items-center justify-center min-h-screen bg-gray-900">
         <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-center text-gray-900">Iniciar Sesión - Admin</h2>
@@ -262,12 +282,10 @@
         </div>
     </div>
 
-    <!-- Sección de Administración (Oculta por defecto) -->
     <div id="admin-section" class="hidden">
         <header class="bg-white shadow-md sticky top-0 z-30">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
-                    <!-- NAVEGACIÓN ACTUALIZADA -->
                     <div class="flex items-baseline space-x-4">
                         <h1 class="text-xl font-bold text-gray-900">Panel de Administración</h1>
                         <a href="admin.html" class="text-sm text-blue-600 font-semibold hover:text-blue-700">Agregar Reloj</a>
@@ -304,7 +322,6 @@
                         </div>
                     </div>
 
-                    <!-- --- INICIO: NUEVOS CAMPOS DE GRUPO --- -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label for="brand" class="block text-sm font-medium text-gray-700">Marca</label>
@@ -361,7 +378,6 @@
                             </select>
                         </div>
                     </div>
-                    <!-- --- FIN: NUEVOS CAMPOS DE GRUPO --- -->
                     
                     <div>
                         <label for="shortDesc" class="block text-sm font-medium text-gray-700">Descripción Corta</label>
@@ -390,7 +406,15 @@
 
                     <div class="flex items-center">
                         <input id="isSold" type="checkbox" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                        <label for="isSold" class="ml-2 block text-sm font-medium text-gray-900">Marcar como Vendido</slabel>
+                        <label for="isSold" class="ml-2 block text-sm font-medium text-gray-900">Marcar como Vendido</label>
+                    </div>
+                    
+                    <div class="flex items-center p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <input id="isHidden" type="checkbox" class="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500">
+                        <label for="isHidden" class="ml-2 block text-sm font-medium text-yellow-800">
+                            Ocultar (Modo Borrador)
+                            <span class="block text-xs text-gray-500 font-normal">No aparecerá en la página principal hasta que desmarques esto.</span>
+                        </label>
                     </div>
 
                     <div>

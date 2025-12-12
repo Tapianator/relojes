@@ -17,13 +17,12 @@
         .aspect-video { padding-bottom: calc(var(--tw-aspect-h) / var(--tw-aspect-w) * 100%); position: relative; }
         .aspect-video > * { position: absolute; height: 100%; width: 100%; top: 0; left: 0; }
 
-
         body { 
             font-family: 'Inter', sans-serif;
-            background-color: #f7f3e8; /* Color base de papiro muy claro */
-            color: #333; /* Texto principal oscuro */
+            background-color: #f7f3e8;
+            color: #333;
         }
-        /* Animaciones de Modales */
+        /* Animaciones */
         .modal-enter { animation: fadeIn 0.3s ease-out forwards; }
         .modal-leave { animation: fadeOut 0.3s ease-in forwards; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -37,7 +36,7 @@
         .loader, .img-loader::before {
             content: '';
             box-sizing: border-box;
-            border: 3px solid rgba(100, 100, 100, 0.3); /* Loader oscuro */
+            border: 3px solid rgba(100, 100, 100, 0.3);
             border-top-color: #333;
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -47,22 +46,19 @@
         .img-loader::before { width: 30px; height: 30px; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        /* Estilos generales de sección */
+        /* Estilos generales */
         .section-content-wrapper { position: relative; z-index: 1; }
         .section-overlay::before { content: ''; position: absolute; inset: 0; z-index: 0; }
         #about.section-overlay::before { background-color: rgba(247, 243, 232, 0.9); }
         #collection.section-overlay::before { background-color: rgba(235, 228, 205, 0.9); }
-
-        /* Estilos para tarjetas de grupo */
         .group-card-image { background-size: cover; background-position: center; position: relative; }
         .group-card-image::before { content: ''; position: absolute; inset: 0; background-color: rgba(0, 0, 0, 0.6); border-radius: 0.5rem; z-index: 0; }
 
-        /* NUEVOS ESTILOS PARA EL ZOOM */
+        /* Zoom */
         .cursor-zoom-in { cursor: zoom-in; }
-        #zoom-modal { background-color: rgba(0, 0, 0, 0.95); } /* Fondo casi negro para el zoom */
+        #zoom-modal { background-color: rgba(0, 0, 0, 0.95); }
         #zoom-modal img { max-height: 90vh; max-width: 90vw; object-fit: contain; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .gallery-image-container:hover .hover-overlay { opacity: 1; }
-
     </style>
 </head>
 <body class="text-gray-900">
@@ -107,7 +103,6 @@
                      <p>Reunimos una colección que honra la historia de la relojería. Creemos en la elegancia de los automáticos, en el carácter de los mecánicos y en la mística de los cuarzos destructores de imperios.</p>
                      <p>No somos un taller, somos un puente. Somos los exploradores que encuentran la pieza y los curadores que gestionan su servicio con profesionales. No podemos prometer que cada restauración sea idéntica, pero sí garantizamos nuestro compromiso principal: cada reloj que sale de nuestras manos está probado y en perfecto estado de funcionamiento.</p>
                      <p>Estas máquinas están listas para su segunda vida. Piezas de colección para el coleccionista exigente, o accesorios con alma para el día a día.</p>
-                     <p>Te invitamos a encontrar esa pieza de historia que te estaba esperando.</p>
                  </div>
             </div>
         </section>
@@ -167,7 +162,7 @@
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden modal-enter">
         <div id="modal-content" class="bg-[#ddcca6] text-gray-900 rounded-lg shadow-xl w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto relative modal-content-enter scroll-smooth"></div>
     </div>
-
+    
     <div id="zoom-modal" class="fixed inset-0 z-[60] flex items-center justify-center hidden modal-enter" onclick="closeZoomModal()">
         <div class="relative p-4">
              <button class="absolute top-6 right-6 text-white bg-black/50 rounded-full p-2 hover:bg-black/80 transition z-10">
@@ -183,52 +178,75 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        
-        // --- CONFIGURACIÓN DE FIREBASE (Sin cambios) ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
-            authDomain: "sbx-relojes-web.firebaseapp.com",
-            projectId: "sbx-relojes-web",
-            storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c",
-            messagingSenderId: "326032897645",
-            appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
-        };
-        const getSignedUrlFunctionUrl = 'https://us-central1-sbx-relojes-web.cloudfunctions.net/getSignedUrl';
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app, "relojes");
+        // --- INICIO DE LÓGICA ---
         let watchesData = []; 
         const signedUrlCache = new Map();
         let currentGroupingKey = 'origin';
         let currentView = 'groups';
+        let db; 
+        let getSignedUrlFunctionUrl;
 
-        // --- FUNCIÓN PARA OBTENER URL SEGURA (Sin cambios) ---
-        async function getSignedUrl(filePath) {
-            if (!filePath) {
-                console.error("Error: Ruta de archivo vacía.");
-                return 'https://placehold.co/600x600/1a202c/ffffff?text=Ruta+no+especificada';
+        try {
+            // 1. DETECCIÓN DE ENTORNO
+            const hostname = window.location.hostname;
+            
+            // Consideramos "Sandbox" si es Localhost O SI ES tu dominio de pruebas
+            const isSandboxEnv = hostname === "localhost" || 
+                                 hostname.includes("127.0.0.1") || 
+                                 hostname.includes("sbx-relojes-web");
+
+            let firebaseConfig;
+
+            if (isSandboxEnv) {
+                console.log("🛠️ Entorno: Sandbox Detectado (Configuración Hardcodeada)");
+                firebaseConfig = {
+                    apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
+                    authDomain: "sbx-relojes-web.firebaseapp.com",
+                    projectId: "sbx-relojes-web",
+                    storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c",
+                    messagingSenderId: "326032897645",
+                    appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
+                };
+                getSignedUrlFunctionUrl = 'https://us-central1-sbx-relojes-web.cloudfunctions.net/getSignedUrl';
+            } else {
+                console.log("☁️ Entorno: Producción Detectado (Configuración Automática)");
+                const response = await fetch('/__/firebase/init.json');
+                if (!response.ok) throw new Error(`Fallo init.json: ${response.status}`);
+                firebaseConfig = await response.json();
+                getSignedUrlFunctionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/getSignedUrl`;
             }
+
+            // Inicializar Firebase
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app, "relojes");
+
+        } catch (error) {
+            console.error("Error crítico de inicialización:", error);
+        }
+
+        // --- FUNCIONES Y CARGA ---
+        async function getSignedUrl(filePath) {
+            if (!filePath) return 'https://placehold.co/600x600?text=No+Image';
             if (signedUrlCache.has(filePath)) return signedUrlCache.get(filePath); 
             try {
                 const response = await fetch(`${getSignedUrlFunctionUrl}?filePath=${encodeURIComponent(filePath)}`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (!response.ok) throw new Error(`Status ${response.status}`);
                 const data = await response.json();
                 signedUrlCache.set(filePath, data.url);
                 return data.url;
             } catch (error) {
-                console.error(`Error CRÍTICO obteniendo URL para '${filePath}':`, error);
-                return 'https://placehold.co/600x600/1a202c/ffffff?text=Error+al+cargar';
+                console.error(error);
+                return 'https://placehold.co/600x600?text=Error';
             }
         }
 
-        // --- FUNCIÓN IMAGEN FONDO GRUPO (Sin cambios) ---
         function getGroupBackgroundImage(groupName) {
             const groupImageMap = { 'Japon': 'Japon_grupo.jpg', 'Suiza': 'Suiza_grupo.jpg', 'China': 'China_grupo.jpg', 'India': 'India_grupo.jpg', 'Rusia': 'Rusia_grupo.jpg', 'Otros': 'Origen_otros_grupo.jpg' };
             const imageName = groupImageMap[groupName];
             return imageName ? `url('imagenes/grupo_galeria/${imageName}')` : null;
         }
 
-        // --- LÓGICA DE AGRUPACIÓN Y RENDERIZADO (Sin cambios) ---
         function groupDataByKey(key) {
             const grouped = watchesData.reduce((acc, watch) => {
                 const groupName = watch[key] || 'Otros'; 
@@ -246,12 +264,20 @@
             const galleryContainer = document.getElementById('gallery-container');
             const groupTitle = document.getElementById('group-title');
             const filterBar = document.getElementById('filter-bar'); 
+            const loader = document.getElementById('loader');
+            if(loader) loader.style.display = 'none';
+
             galleryContainer.innerHTML = ''; 
             galleryContainer.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8'; 
             filterBar.classList.add('hidden'); 
             groupTitle.classList.add('hidden'); 
+            
             const groups = groupDataByKey(currentGroupingKey);
-            if (Object.keys(groups).length === 0) { galleryContainer.innerHTML = `<p class="text-gray-700 col-span-3 text-center">No se encontraron relojes.</p>`; return; }
+            if (Object.keys(groups).length === 0) { 
+                galleryContainer.innerHTML = `<p class="text-gray-700 col-span-3 text-center">No se encontraron relojes.</p>`; 
+                return; 
+            }
+            
             for (const groupName in groups) {
                 const items = groups[groupName];
                 const card = document.createElement('div');
@@ -288,10 +314,25 @@
             if (watchesToRender.length === 0) { galleryContainer.innerHTML = `<p class="text-gray-700 col-span-3 text-center">No hay relojes en este grupo.</p>`; return; }
             for (const watch of watchesToRender) {
                 const card = document.createElement('div');
-                card.className = 'bg-[#ebe4cd] rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 relative border border-[#ddcca6]'; 
+                card.className = 'bg-[#ebe4cd] rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 relative border border-[#ddcca6] group'; 
                 const mainImage = watch.mainImage || watch.mainimage;
-                const soldOverlay = watch.isSold ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center z-10"><span class="text-white text-2xl font-bold border-2 border-white py-2 px-4 rounded-md">VENDIDO</span></div>` : '';
-                card.innerHTML = `${soldOverlay}<div class="relative h-72 bg-gray-400"><div class="img-loader"></div><img class="w-full h-full object-cover hidden" data-src="${mainImage}" alt="${watch.name || 'Reloj'}" /></div><div class="p-6"><h3 class="text-xl font-bold text-gray-900 mb-2">${watch.name || 'Sin nombre'}</h3><p class="text-gray-700 mb-4">${watch.shortDesc || 'Sin descripción.'}</p><div class="flex justify-between items-center"><span class="text-lg font-semibold text-gray-900">${watch.price || ''}</span><button data-id="${watch.id}" class="view-details-btn bg-[#ddcca6] hover:bg-[#c9b78e] text-gray-900 font-semibold py-2 px-4 border border-transparent rounded-lg transition shadow-sm cursor-pointer">Ver Detalles</button></div></div>`;
+                const soldOverlay = watch.isSold ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center z-10 pointer-events-none"><span class="text-white text-2xl font-bold border-2 border-white py-2 px-4 rounded-md">VENDIDO</span></div>` : '';
+                
+                card.innerHTML = `
+                    <a href="javascript:void(0)" class="block relative h-72 bg-gray-400 image-trigger cursor-pointer" data-id="${watch.id}">
+                        ${soldOverlay}
+                        <div class="img-loader"></div>
+                        <img class="w-full h-full object-cover hidden transition-transform duration-500 group-hover:scale-105" data-src="${mainImage}" alt="${watch.name || 'Reloj'}" />
+                    </a>
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold text-gray-900 mb-2">${watch.name || 'Sin nombre'}</h3>
+                        <p class="text-gray-700 mb-4">${watch.shortDesc || 'Sin descripción.'}</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-lg font-semibold text-gray-900">${watch.price || ''}</span>
+                            <button data-id="${watch.id}" class="view-details-btn bg-[#ddcca6] hover:bg-[#c9b78e] text-gray-900 font-semibold py-2 px-4 border border-transparent rounded-lg transition shadow-sm cursor-pointer">Ver Detalles</button>
+                        </div>
+                    </div>
+                `;
                 galleryContainer.appendChild(card);
                 const imgElement = card.querySelector('img[data-src]');
                 const loaderElement = card.querySelector('.img-loader');
@@ -304,40 +345,51 @@
             }
         }
 
-
-        // --- LÓGICA DE CARGA PRINCIPAL ---
+        // --- DOM LOAD ---
         document.addEventListener('DOMContentLoaded', async () => {
             const galleryContainer = document.getElementById('gallery-container');
-            const loader = document.getElementById('loader');
             const groupBySelect = document.getElementById('group-by-select');
             const filterBar = document.getElementById('filter-bar');
             
             try {
+                if (!db) throw new Error("DB no inicializada.");
+                
                 const querySnapshot = await getDocs(collection(db, "wathces"));
-                if (querySnapshot.empty) { loader.style.display = 'none'; galleryContainer.innerHTML = `<p class="text-yellow-700">No hay relojes.</p>`; return; }
-                watchesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                loader.style.display = 'none';
-                galleryContainer.classList.remove('flex', 'items-center', 'justify-center');
+
+                if (querySnapshot.empty) { 
+                    document.getElementById('loader').style.display = 'none'; 
+                    galleryContainer.innerHTML = `<p class="text-yellow-700">No hay relojes cargados.</p>`; 
+                    return; 
+                }
+                
+                watchesData = querySnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(watch => !watch.isHidden);
+
                 renderGroupView();
 
+                // Listeners
                 if (groupBySelect) { groupBySelect.addEventListener('change', (e) => { currentGroupingKey = e.target.value; renderGroupView(); }); }
                 filterBar.addEventListener('click', (e) => { if (e.target.closest('#back-to-groups-btn')) renderGroupView(); });
+                
                 galleryContainer.addEventListener('click', (e) => {
                     if (currentView === 'groups') {
                         const groupCard = e.target.closest('.group-card');
                         if (groupCard) renderItemView(groupCard.dataset.groupName);
                     } else if (currentView === 'items') {
-                        const detailsButton = e.target.closest('.view-details-btn');
-                        if (detailsButton) {
-                            const selectedWatch = watchesData.find(w => w.id === detailsButton.dataset.id);
+                        let triggerElement = e.target.closest('.view-details-btn') || e.target.closest('.image-trigger');
+                        if (triggerElement) {
+                            const selectedWatch = watchesData.find(w => w.id === triggerElement.dataset.id);
                             if (selectedWatch) openModal(selectedWatch);
                         }
                     }
                 });
 
-            } catch (error) { console.error("Error CRÍTICO:", error); loader.style.display = 'none'; galleryContainer.innerHTML = `<p class="text-red-600">Error al cargar.</p>`; }
-            
-            // --- LÓGICA DEL MODAL DE DETALLES (ACTUALIZADA: BOTÓN GALERÍA Y SCROLL) ---
+            } catch (error) {
+                console.error("Error en carga:", error);
+                document.getElementById('loader').style.display = 'none';
+                galleryContainer.innerHTML = `<p style="color:red; font-weight:bold;">Error al cargar la galería.</p>`;
+            }
 
             async function openModal(watch) {
                 const modalContent = document.getElementById('modal-content');
@@ -370,7 +422,6 @@
                 const videoHtml = watch.videoUrl ? `<div class="mt-6 pt-6 border-t border-[#ddcca6]/50"><h4 class="text-xl font-semibold mb-4 text-gray-900 flex items-center"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Video del Reloj</h4><div class="aspect-w-16 aspect-h-9shadow-sm"><iframe class="rounded-lg border border-[#ddcca6]" src="${watch.videoUrl}" frameborder="0" allowfullscreen></iframe></div></div>` : '';
                 const buyButton = watch.isSold ? `<div class="w-full bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg text-center shadow-md uppercase tracking-wider">Vendido</div>` : `<a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20el%20reloj%20${encodeURIComponent(watch.name)}." target="_blank" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition inline-flex items-center justify-center shadow-md hover:shadow-lg">Comprar por WhatsApp</a>`;
 
-                // --- CAMBIOS EN ESTA SECCIÓN ---
                 modalContent.innerHTML = `
                     <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-700 hover:text-gray-900 z-20 bg-white/80 backdrop-blur rounded-full p-1 hover:bg-white transition shadow-sm">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -383,10 +434,8 @@
                             </div>
 
                             <div class="relative z-10">
-                                
                                 <div class="flex flex-col sm:flex-row justify-between items-start gap-3 mb-5 border-b-2 border-[#ddcca6] pb-3">
                                     <h3 class="text-3xl font-bold text-gray-900 font-serif leading-tight">${watch.name || "Sin nombre"}</h3>
-                                    
                                     <button onclick="document.getElementById('gallery-section').scrollIntoView({ behavior: 'smooth' })" 
                                             class="shrink-0 text-sm bg-white/60 hover:bg-[#ddcca6] border border-[#ddcca6] text-gray-800 px-3 py-1.5 rounded-full transition flex items-center gap-2 cursor-pointer shadow-sm">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -395,7 +444,6 @@
                                         Ver Galería
                                     </button>
                                 </div>
-
                                 <p class="text-gray-800 mb-8 text-base leading-relaxed text-justify font-medium pr-2">
                                     ${watch.longDesc || "Sin descripción."}
                                 </p>
@@ -425,7 +473,6 @@
                 });
             }
 
-            // Listeners para cerrar el modal principal
             document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('#close-modal-btn')) closeModal(); });
             document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!document.getElementById('zoom-modal').classList.contains('hidden')) { closeZoomModal(); } else if (!document.getElementById('modal').classList.contains('hidden')) { closeModal(); }} });
 
@@ -443,7 +490,6 @@
             }
         });
 
-        // --- FUNCIONES GLOBALES PARA EL ZOOM ---
         window.openZoomModal = (url) => {
             const zoomModal = document.getElementById('zoom-modal');
             const zoomedImage = document.getElementById('zoomed-image');
@@ -457,7 +503,7 @@
              zoomModal.addEventListener('animationend', () => {
                 zoomModal.classList.add('hidden');
                 zoomModal.classList.remove('modal-leave');
-                document.getElementById('zoomed-image').src = ''; // Limpiar src
+                document.getElementById('zoomed-image').src = ''; 
             }, { once: true });
         }
     </script>
