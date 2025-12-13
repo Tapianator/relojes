@@ -37,229 +37,211 @@
         import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
         import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
 
-        // --- CONFIGURACIÓN DE FIREBASE INTELIGENTE (AUTO-DETECT) ---
-        let firebaseConfig;
-        
-        // 1. Detectamos si estamos en Localhost (Entorno de Desarrollo/Sandbox Local)
-        if (window.location.hostname === "localhost" || window.location.hostname.includes("127.0.0.1") || window.location.hostname.includes("192.168")) {
-            console.log("🛠️ Admin: Modo Desarrollo Local detectado (SBX)");
-            
-            // Credenciales de SANDBOX (Las que ya tenías funcionando)
-            firebaseConfig = {
-                apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OC8PG4ClleCxQ",
-                authDomain: "sbx-relojes-web.firebaseapp.com",
-                projectId: "sbx-relojes-web",
-                storageBucket: "sbx-relojes-web.firebasestorage.app", 
-                messagingSenderId: "326032897645",
-                appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
-            };
-        } else {
-            // 2. Modo Nube (Desplegado en Hosting)
-            console.log("☁️ Admin: Modo Nube detectado. Obteniendo configuración...");
+        // Variables globales para los servicios de Firebase
+        let app, auth, db, storage;
+
+        // --- FUNCIÓN PRINCIPAL DE INICIALIZACIÓN ---
+        (async function initAdminSystem() {
             try {
+                console.log("🔄 Iniciando Panel de Administración...");
+
+                // 1. OBTENER CONFIGURACIÓN AUTOMÁTICA
+                // Esto funciona tanto en Sandbox como en Producción si el sitio está desplegado.
                 const response = await fetch('/__/firebase/init.json');
-                if (!response.ok) throw new Error("No se pudo cargar la configuración de Firebase");
-                firebaseConfig = await response.json();
-                console.log(`🚀 Admin conectado al proyecto: ${firebaseConfig.projectId}`);
-            } catch (e) {
-                console.error("Error CRÍTICO obteniendo configuración automática:", e);
-            }
-        }
-        
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app, "relojes");
-        const storage = getStorage(app); 
-
-        // --- INICIALIZACIÓN DE APP CHECK ---
-        const appCheck = initializeAppCheck(app, {
-            provider: new ReCaptchaV3Provider('6LepBPcrAAAAALCfr-9FnQjgBVZdJn_0ZRXpNVqR'), 
-            isTokenAutoRefreshEnabled: true
-        });
-
-        // --- Elementos del DOM ---
-        const loginSection = document.getElementById('login-section');
-        const adminSection = document.getElementById('admin-section');
-        const loginForm = document.getElementById('login-form');
-        const loginEmail = document.getElementById('login-email');
-        const loginPassword = document.getElementById('login-password');
-        const loginError = document.getElementById('login-error');
-        const userInfo = document.getElementById('user-info');
-        const logoutButton = document.getElementById('logout-button');
-        const saveWatchForm = document.getElementById('save-watch-form');
-        const saveButton = document.getElementById('save-button');
-        const saveButtonText = document.getElementById('save-button-text');
-        const saveSpinner = document.getElementById('save-spinner');
-        const formMessage = document.getElementById('form-message');
-
-        // --- LÓGICA DE AUTENTICACIÓN ---
-        setPersistence(auth, browserSessionPersistence) 
-            .then(() => {
-                console.log("Persistencia de sesión configurada.");
-            })
-            .catch((error) => {
-                console.error("Error al configurar persistencia: ", error);
-            });
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                loginSection.classList.add('hidden');
-                adminSection.classList.remove('hidden');
-                userInfo.textContent = `Bienvenido, ${user.email}`;
-            } else {
-                loginSection.classList.remove('hidden');
-                adminSection.classList.add('hidden');
-            }
-        });
-
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = loginEmail.value;
-            const password = loginPassword.value;
-            loginError.classList.add('hidden');
-
-            signInWithEmailAndPassword(auth, email, password)
-                .catch((error) => {
-                    console.error("Error al iniciar sesión: ", error);
-                    loginError.textContent = `Error: ${error.message}`;
-                    loginError.classList.remove('hidden');
-                });
-        });
-
-        logoutButton.addEventListener('click', () => {
-            signOut(auth);
-        });
-
-        // --- LÓGICA DE GUARDAR RELOJ ---
-        saveWatchForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            formMessage.classList.add('hidden');
-            setLoading(true);
-
-            console.log("--- DEBUG: Iniciando guardado de reloj ---");
-
-            const user = auth.currentUser;
-            
-            if (!user) {
-                console.error("DEBUG: ¡ERROR! Intento de guardado sin usuario autenticado.");
-                showMessage("Error: No estás autenticado. Por favor, inicia sesión de nuevo.", true);
-                setLoading(false);
-                return;
-            }
-            console.log(`DEBUG: Usuario autenticado: ${user.email} (UID: ${user.uid})`);
-            
-            // --- Captura de datos básicos ---
-            const watchName = document.getElementById('name').value;
-            const watchPrice = document.getElementById('price').value;
-            const storageFolder = document.getElementById('folder').value;
-            const shortDesc = document.getElementById('shortDesc').value;
-            const longDesc = document.getElementById('longDesc').value;
-            const videoUrl = document.getElementById('videoUrl').value;
-            const isSold = document.getElementById('isSold').checked;
-            
-            // --- NUEVO: Captura de Oculto ---
-            const isHidden = document.getElementById('isHidden').checked;
-
-            const mainImageFile = document.getElementById('mainImage').files[0];
-            const galleryFiles = document.getElementById('gallery').files;
-
-            // --- Captura de nuevos campos ---
-            const brand = document.getElementById('brand').value;
-            const origin = document.getElementById('origin').value;
-            const type = document.getElementById('type').value;
-            const decade = document.getElementById('decade').value;
-
-
-            if (!mainImageFile || !storageFolder) {
-                showMessage("Error: Faltan la imagen principal o el nombre de la carpeta.", true);
-                setLoading(false);
-                return;
-            }
-
-            try {
-                // 1. Subir Imagen Principal
-                console.log(`DEBUG: Intentando subir imagen principal a: ${storageFolder}/${mainImageFile.name}`);
-                const mainImageRef = ref(storage, `${storageFolder}/${mainImageFile.name}`);
-                const mainImageSnapshot = await uploadBytes(mainImageRef, mainImageFile);
-                const mainImagePath = mainImageSnapshot.metadata.fullPath;
-                console.log(`DEBUG: Imagen principal subida: ${mainImagePath}`);
-
-                // 2. Subir Galería (múltiples archivos)
-                let galleryPaths = [];
-                console.log(`DEBUG: Intentando subir ${galleryFiles.length} imágenes de galería.`);
-                for (const file of galleryFiles) {
-                    const galleryRef = ref(storage, `${storageFolder}/${file.name}`);
-                    const gallerySnapshot = await uploadBytes(galleryRef, file);
-                    galleryPaths.push(gallerySnapshot.metadata.fullPath);
-                }
-                console.log(`DEBUG: Imágenes de galería subidas:`, galleryPaths);
-
-                // 3. Preparar datos para Firestore
-                const watchData = {
-                    name: watchName,
-                    price: watchPrice,
-                    shortDesc: shortDesc,
-                    longDesc: longDesc,
-                    videoUrl: videoUrl,
-                    isSold: isSold,
-                    
-                    // Guardamos el estado de oculto
-                    isHidden: isHidden,
-
-                    mainImage: mainImagePath, 
-                    gallery: galleryPaths,
-                    brand: brand,
-                    origin: origin,
-                    type: type,
-                    decade: decade
-                };
-
-                // 4. Guardar en Firestore
-                console.log(`DEBUG: Intentando guardar datos en Firestore, colección 'watches'`);
-                const docRef = await addDoc(collection(db, "watches"), watchData);
-                console.log(`DEBUG: ¡Éxito! Documento creado con ID: ${docRef.id}`);
                 
-                showMessage("¡Reloj guardado con éxito!", false);
-                saveWatchForm.reset();
+                if (!response.ok) {
+                    throw new Error("No se pudo cargar la configuración de Firebase. Asegúrate de acceder desde la URL desplegada (Firebase Hosting).");
+                }
+
+                const firebaseConfig = await response.json();
+                console.log(`✅ Configuración cargada para proyecto: ${firebaseConfig.projectId}`);
+
+                // 2. INICIALIZAR FIREBASE
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app, "relojes");
+                storage = getStorage(app);
+
+                // 3. INICIALIZAR APP CHECK
+                initializeAppCheck(app, {
+                    provider: new ReCaptchaV3Provider('6LepBPcrAAAAALCfr-9FnQjgBVZdJn_0ZRXpNVqR'), 
+                    isTokenAutoRefreshEnabled: true
+                });
+
+                // 4. CONFIGURAR PERSISTENCIA Y LISTENER DE AUTH
+                setupAuthListeners();
 
             } catch (error) {
-                console.error("--- DEBUG: ERROR CRÍTICO AL GUARDAR EL RELOJ ---");
-                console.error("Código de Error:", error.code); 
-                console.error("Mensaje de Error:", error.message);
-                
-                let friendlyMessage = "Error al subir el reloj. Revisa la consola para más detalles.";
-                if (error.code === 'storage/unauthorized') {
-                    friendlyMessage = "Error: Permiso denegado por Storage.";
-                } else if (error.code === 'permission-denied') {
-                     friendlyMessage = "Error: Permiso denegado por Firestore.";
+                console.error("❌ Error Crítico de Inicialización:", error);
+                document.body.innerHTML = `<div class="p-10 text-center text-red-600 font-bold">Error fatal al cargar el sistema: ${error.message}</div>`;
+            }
+        })();
+
+        // --- CONFIGURACIÓN DE UI Y EVENTOS ---
+        // (Se ejecuta dentro de initAdminSystem una vez que Firebase está listo)
+        
+        function setupAuthListeners() {
+            const loginSection = document.getElementById('login-section');
+            const adminSection = document.getElementById('admin-section');
+            const userInfo = document.getElementById('user-info');
+            const loginForm = document.getElementById('login-form');
+            const logoutButton = document.getElementById('logout-button');
+
+            // Configurar persistencia
+            setPersistence(auth, browserSessionPersistence)
+                .then(() => console.log("💾 Persistencia de sesión activada"))
+                .catch((err) => console.error("Error persistencia:", err));
+
+            // Escuchar cambios de estado (Login/Logout)
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    console.log("👤 Usuario autenticado:", user.email);
+                    loginSection.classList.add('hidden');
+                    adminSection.classList.remove('hidden');
+                    userInfo.textContent = `Hola, ${user.email}`;
+                } else {
+                    console.log("🔒 Usuario no autenticado");
+                    loginSection.classList.remove('hidden');
+                    adminSection.classList.add('hidden');
                 }
-                showMessage(friendlyMessage, true);
-            } finally {
-                setLoading(false);
-            }
-        });
+            });
 
-        // --- Funciones de Utilidad ---
-        function setLoading(isLoading) {
-            if (isLoading) {
-                saveButton.disabled = true;
-                saveButtonText.classList.add('hidden');
-                saveSpinner.classList.remove('hidden');
-            } else {
-                saveButton.disabled = false;
-                saveButtonText.classList.remove('hidden');
-                saveSpinner.classList.add('hidden');
-            }
+            // Evento Login
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                const loginError = document.getElementById('login-error');
+                
+                loginError.classList.add('hidden');
+
+                signInWithEmailAndPassword(auth, email, password)
+                    .catch((error) => {
+                        console.error("Error login:", error);
+                        loginError.textContent = `Error: ${error.message}`;
+                        loginError.classList.remove('hidden');
+                    });
+            });
+
+            // Evento Logout
+            logoutButton.addEventListener('click', () => {
+                signOut(auth);
+            });
+
+            // Iniciar lógica del formulario de guardado
+            setupSaveForm();
         }
 
-        function showMessage(message, isError = false) {
-            formMessage.textContent = message;
-            formMessage.className = isError 
-                ? 'text-red-500 text-sm mt-4' 
-                : 'text-green-500 text-sm mt-4';
-            formMessage.classList.remove('hidden');
-        }
+        function setupSaveForm() {
+            const saveWatchForm = document.getElementById('save-watch-form');
+            const saveButton = document.getElementById('save-button');
+            const saveButtonText = document.getElementById('save-button-text');
+            const saveSpinner = document.getElementById('save-spinner');
+            const formMessage = document.getElementById('form-message');
 
+            saveWatchForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                formMessage.classList.add('hidden');
+                setLoading(true);
+
+                const user = auth.currentUser;
+                if (!user) {
+                    showMessage("Error: Sesión expirada.", true);
+                    setLoading(false);
+                    return;
+                }
+
+                // Captura de datos
+                const watchName = document.getElementById('name').value;
+                const watchPrice = document.getElementById('price').value;
+                const storageFolder = document.getElementById('folder').value;
+                const shortDesc = document.getElementById('shortDesc').value;
+                const longDesc = document.getElementById('longDesc').value;
+                const videoUrl = document.getElementById('videoUrl').value;
+                const isSold = document.getElementById('isSold').checked;
+                const isHidden = document.getElementById('isHidden').checked;
+                
+                const mainImageFile = document.getElementById('mainImage').files[0];
+                const galleryFiles = document.getElementById('gallery').files;
+
+                const brand = document.getElementById('brand').value;
+                const origin = document.getElementById('origin').value;
+                const type = document.getElementById('type').value;
+                const decade = document.getElementById('decade').value;
+
+                if (!mainImageFile || !storageFolder) {
+                    showMessage("Error: Faltan datos obligatorios (Imagen o Carpeta).", true);
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    // 1. Subir Imagen Principal
+                    console.log(`📤 Subiendo imagen principal a: ${storageFolder}...`);
+                    const mainImageRef = ref(storage, `${storageFolder}/${mainImageFile.name}`);
+                    const mainImageSnapshot = await uploadBytes(mainImageRef, mainImageFile);
+                    const mainImagePath = mainImageSnapshot.metadata.fullPath;
+
+                    // 2. Subir Galería
+                    let galleryPaths = [];
+                    console.log(`uploading ${galleryFiles.length} imágenes de galería...`);
+                    for (const file of galleryFiles) {
+                        const galleryRef = ref(storage, `${storageFolder}/${file.name}`);
+                        const gallerySnapshot = await uploadBytes(galleryRef, file);
+                        galleryPaths.push(gallerySnapshot.metadata.fullPath);
+                    }
+
+                    // 3. Guardar en Firestore
+                    const watchData = {
+                        name: watchName,
+                        price: watchPrice,
+                        shortDesc: shortDesc,
+                        longDesc: longDesc,
+                        videoUrl: videoUrl,
+                        isSold: isSold,
+                        isHidden: isHidden,
+                        mainImage: mainImagePath, 
+                        gallery: galleryPaths,
+                        brand: brand,
+                        origin: origin,
+                        type: type,
+                        decade: decade
+                    };
+
+                    console.log("💾 Guardando en Firestore...");
+                    await addDoc(collection(db, "watches"), watchData);
+                    
+                    showMessage("¡Reloj guardado exitosamente!", false);
+                    saveWatchForm.reset();
+
+                } catch (error) {
+                    console.error("Error al guardar:", error);
+                    showMessage(`Error: ${error.message}`, true);
+                } finally {
+                    setLoading(false);
+                }
+            });
+
+            function setLoading(isLoading) {
+                if (isLoading) {
+                    saveButton.disabled = true;
+                    saveButtonText.classList.add('hidden');
+                    saveSpinner.classList.remove('hidden');
+                } else {
+                    saveButton.disabled = false;
+                    saveButtonText.classList.remove('hidden');
+                    saveSpinner.classList.add('hidden');
+                }
+            }
+
+            function showMessage(message, isError = false) {
+                formMessage.textContent = message;
+                formMessage.className = isError 
+                    ? 'text-red-500 text-sm mt-4 font-bold' 
+                    : 'text-green-600 text-sm mt-4 font-bold';
+                formMessage.classList.remove('hidden');
+            }
+        }
     </script>
 
     <div id="login-section" class="flex items-center justify-center min-h-screen bg-gray-900">
@@ -268,7 +250,7 @@
             <form id="login-form" class="space-y-6">
                 <div>
                     <label for="login-email" class="text-sm font-medium text-gray-700">Email</label>
-                    <input id="login-email" name="email" type="email" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" value="" placeholder="tu@email.com">
+                    <input id="login-email" name="email" type="email" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="tu@email.com">
                 </div>
                 <div>
                     <label for="login-password" class="text-sm font-medium text-gray-700">Contraseña</label>

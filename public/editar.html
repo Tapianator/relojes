@@ -50,7 +50,7 @@
         import { 
             getAuth, 
             onAuthStateChanged, 
-            signInWithEmailAndPassword,
+            signInWithEmailAndPassword, 
             signOut,
             setPersistence,
             browserSessionPersistence 
@@ -76,545 +76,327 @@
         } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
         import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
 
-        // --- CONFIGURACIÓN DE FIREBASE INTELIGENTE (AUTO-DETECT) ---
-        let firebaseConfig;
-        
-        // 1. Detectamos si estamos en Localhost (Entorno de Desarrollo/Sandbox Local)
-        if (window.location.hostname === "localhost" || window.location.hostname.includes("127.0.0.1") || window.location.hostname.includes("192.168")) {
-            console.log("🛠️ Admin: Modo Desarrollo Local detectado (SBX)");
-            
-            // Credenciales de SANDBOX (Las que ya tenías funcionando)
-            firebaseConfig = {
-                apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
-                authDomain: "sbx-relojes-web.firebaseapp.com",
-                projectId: "sbx-relojes-web",
-                storageBucket: "sbx-relojes-web.firebasestorage.app",
-                messagingSenderId: "326032897645",
-                appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
-            };
-        } else {
-            // 2. Modo Nube (Desplegado en Hosting)
-            console.log("☁️ Admin: Modo Nube detectado. Obteniendo configuración...");
-            try {
-                const response = await fetch('/__/firebase/init.json');
-                if (!response.ok) throw new Error("No se pudo cargar la configuración de Firebase");
-                firebaseConfig = await response.json();
-                console.log(`🚀 Admin conectado al proyecto: ${firebaseConfig.projectId}`);
-            } catch (e) {
-                console.error("Error CRÍTICO obteniendo configuración automática:", e);
-            }
-        }
-        
-        // --- INICIALIZACIÓN ---
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app, "relojes");
-        const storage = getStorage(app);
+        // Variables Globales de Firebase
+        let app, auth, db, storage;
+        let unsubscribeFromWatches = null;
 
-        // App Check (Solo si tienes configurado el token reCAPTCHA para ambos dominios, si falla en PRD revisa la consola de AppCheck)
-        // Nota: Si usas el mismo token para ambos, podría fallar en uno. Lo ideal es registrar ambos dominios en la consola de reCAPTCHA.
-        const appCheck = initializeAppCheck(app, {
-            provider: new ReCaptchaV3Provider('6LepBPcrAAAAALCfr-9FnQjgBVZdJn_0ZRXpNVqR'),
-            isTokenAutoRefreshEnabled: true
-        });
-
-        // --- Elementos del DOM ---
-        const loginSection = document.getElementById('login-section');
-        const adminSection = document.getElementById('admin-section');
-        const loginForm = document.getElementById('login-form'); 
-        const loginEmail = document.getElementById('login-email'); 
-        const loginPassword = document.getElementById('login-password'); 
-        const loginError = document.getElementById('login-error'); 
-        const userInfo = document.getElementById('user-info');
-        const logoutButton = document.getElementById('logout-button');
-        const watchListContainer = document.getElementById('watch-list-container');
-        const listLoader = document.getElementById('list-loader');
-        
-        // Modal de Edición (Texto)
-        const editModal = document.getElementById('edit-modal');
-        const editModalContent = document.getElementById('edit-modal-content');
-        const editForm = document.getElementById('edit-form');
-        const editSpinner = document.getElementById('edit-spinner');
-        const editButtonText = document.getElementById('edit-button-text');
-        
-        // Modal de Borrado (Reloj)
-        const deleteModal = document.getElementById('delete-modal');
-        const deleteConfirmButton = document.getElementById('delete-confirm-btn');
-        const deleteCancelButton = document.getElementById('delete-cancel-btn');
+        // Variables de Estado de UI
         let currentDeleteId = null; 
-        
-        // Modal de Imágenes
-        const imageModal = document.getElementById('image-modal');
-        const imageModalContent = document.getElementById('image-modal-content');
-        const imageModalLoader = document.getElementById('image-modal-loader');
-        const imageGrid = document.getElementById('image-grid');
-        
-        // Elementos Uploader Galería
-        const imageUploader = document.getElementById('image-uploader');
-        const uploadSpinner = document.getElementById('upload-spinner');
-        
-        // NUEVOS: Elementos Uploader Imagen Principal
-        const mainImageUploader = document.getElementById('main-image-uploader');
-        const mainUploadSpinner = document.getElementById('main-upload-spinner');
-
         let currentEditDocId = null; 
         let currentEditFolder = null; 
 
-        let unsubscribeFromWatches = null; 
+        // --- INICIALIZACIÓN AUTOMÁTICA ---
+        (async function initEditorSystem() {
+            try {
+                console.log("🔄 Iniciando Editor...");
 
-        // --- LÓGICA DE AUTENTICACIÓN ---
-        setPersistence(auth, browserSessionPersistence); 
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                loginSection.classList.add('hidden');
-                adminSection.classList.remove('hidden');
-                userInfo.textContent = `Bienvenido, ${user.email}`;
-                loadWatches(); 
-            } else {
-                loginSection.classList.remove('hidden');
-                adminSection.classList.add('hidden');
-                if (unsubscribeFromWatches) {
-                    unsubscribeFromWatches(); 
+                // 1. Obtener Configuración Segura
+                const response = await fetch('/__/firebase/init.json');
+                if (!response.ok) {
+                    throw new Error("No se pudo cargar la configuración de Firebase (init.json).");
                 }
+                const firebaseConfig = await response.json();
+                console.log(`✅ Conectado al proyecto: ${firebaseConfig.projectId}`);
+
+                // 2. Inicializar Firebase
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app, "relojes");
+                storage = getStorage(app);
+
+                // 3. App Check
+                initializeAppCheck(app, {
+                    provider: new ReCaptchaV3Provider('6LepBPcrAAAAALCfr-9FnQjgBVZdJn_0ZRXpNVqR'),
+                    isTokenAutoRefreshEnabled: true
+                });
+
+                // 4. Iniciar Lógica de la App
+                setupAppLogic();
+
+            } catch (error) {
+                console.error("❌ Error Fatal:", error);
+                document.body.innerHTML = `<div class="p-10 text-center text-red-600 font-bold">Error de sistema: ${error.message}</div>`;
             }
-        });
+        })();
 
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = loginEmail.value;
-            const password = loginPassword.value;
-            loginError.classList.add('hidden');
-
-            signInWithEmailAndPassword(auth, email, password)
-                .catch((error) => {
-                    console.error("Error al iniciar sesión: ", error);
-                    loginError.textContent = `Error: ${error.message}`;
-                    loginError.classList.remove('hidden');
-                });
-        });
-
-        logoutButton.addEventListener('click', () => {
-            signOut(auth);
-        });
-
-        // --- LÓGICA DE CARGAR/MOSTRAR RELOJES ---
-        function loadWatches() {
-            listLoader.classList.remove('hidden');
-            const q = query(collection(db, "watches"));
+        function setupAppLogic() {
+            // --- Elementos del DOM ---
+            const loginSection = document.getElementById('login-section');
+            const adminSection = document.getElementById('admin-section');
+            const loginForm = document.getElementById('login-form'); 
+            const loginEmail = document.getElementById('login-email'); 
+            const loginPassword = document.getElementById('login-password'); 
+            const loginError = document.getElementById('login-error'); 
+            const userInfo = document.getElementById('user-info');
+            const logoutButton = document.getElementById('logout-button');
+            const watchListContainer = document.getElementById('watch-list-container');
+            const listLoader = document.getElementById('list-loader');
             
-            unsubscribeFromWatches = onSnapshot(q, (querySnapshot) => {
-                listLoader.classList.add('hidden');
-                watchListContainer.innerHTML = ''; 
-                
-                if (querySnapshot.empty) {
-                    watchListContainer.innerHTML = `<p class="text-gray-500">No se han encontrado relojes.</p>`;
-                    return;
+            // --- AUTHENTICATION ---
+            setPersistence(auth, browserSessionPersistence); 
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    loginSection.classList.add('hidden');
+                    adminSection.classList.remove('hidden');
+                    userInfo.textContent = `Hola, ${user.email}`;
+                    loadWatches(); // Cargar datos
+                } else {
+                    loginSection.classList.remove('hidden');
+                    adminSection.classList.add('hidden');
+                    if (unsubscribeFromWatches) unsubscribeFromWatches(); 
                 }
-                querySnapshot.forEach((doc) => {
-                    const watch = { id: doc.id, ...doc.data() };
-                    const watchElement = createWatchRow(watch);
-                    watchListContainer.appendChild(watchElement);
-                });
-            }, (error) => {
-                console.error("Error al cargar relojes: ", error);
-                listLoader.classList.add('hidden');
-                watchListContainer.innerHTML = `<p class="text-red-500">Error al cargar la lista. Revisa la consola.</p>`;
             });
-        }
 
-        function createWatchRow(watch) {
-            const div = document.createElement('div');
-            div.className = 'bg-white p-4 rounded-lg shadow-md flex items-center justify-between space-x-4';
-            
-            let statusBadge = '';
-            if (watch.isHidden) {
-                statusBadge = `<span class="text-xs font-medium bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full border border-yellow-200">Oculto</span>`;
-            } else if (watch.isSold) {
-                statusBadge = `<span class="text-xs font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Vendido</span>`;
-            } else {
-                statusBadge = `<span class="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">A la venta</span>`;
-            }
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = loginEmail.value;
+                const password = loginPassword.value;
+                loginError.classList.add('hidden');
 
-            div.innerHTML = `
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-gray-900 truncate">${watch.name || 'Sin nombre'}</p>
-                    <p class="text-sm text-gray-500 truncate">${watch.price || 'Sin precio'}</p>
-                </div>
-                <div class="flex-shrink-0 flex items-center space-x-2">
-                    ${statusBadge}
-                    <button data-id="${watch.id}" class="image-btn p-2 text-gray-500 hover:text-purple-600" title="Administrar Imágenes">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l-1.586-1.586a2 2 0 00-2.828 0L6 14m6-6l.01.01"></path></svg>
-                    </button>
-                    <button data-id="${watch.id}" class="edit-btn p-2 text-gray-500 hover:text-blue-600" title="Editar Texto">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                    </button>
-                    <button data-id="${watch.id}" class="delete-btn p-2 text-gray-500 hover:text-red-600" title="Borrar Reloj">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </div>
-            `;
-            return div;
-        }
+                signInWithEmailAndPassword(auth, email, password)
+                    .catch((error) => {
+                        console.error("Login Error:", error);
+                        loginError.textContent = `Error: ${error.message}`;
+                        loginError.classList.remove('hidden');
+                    });
+            });
 
-        // --- LÓGICA DE EDITAR, BORRAR Y GESTIONAR IMÁGENES ---
-        watchListContainer.addEventListener('click', (e) => {
-            const editButton = e.target.closest('.edit-btn');
-            const deleteButton = e.target.closest('.delete-btn');
-            const imageButton = e.target.closest('.image-btn');
+            logoutButton.addEventListener('click', () => signOut(auth));
 
-            if (editButton) {
-                const docId = editButton.dataset.id;
-                openEditModal(docId);
-            }
-            if (deleteButton) {
-                const docId = deleteButton.dataset.id;
-                openDeleteModal(docId);
-            }
-            if (imageButton) {
-                const docId = imageButton.dataset.id;
-                openImageModal(docId);
-            }
-        });
-
-        // --- Edición (Modal de Texto) ---
-        async function openEditModal(docId) {
-            const docRef = doc(db, "watches", docId);
-            const snap = await getDoc(docRef);
-
-            if (!snap.exists()) {
-                console.error("No se encontró el documento para editar");
-                return;
-            }
-            const watch = snap.data();
-
-            document.getElementById('edit-id').value = docId;
-            document.getElementById('edit-name').value = watch.name || '';
-            document.getElementById('edit-price').value = watch.price || '';
-            document.getElementById('edit-folder').value = watch.mainImage ? watch.mainImage.split('/')[0] : ''; 
-            document.getElementById('edit-shortDesc').value = watch.shortDesc || '';
-            document.getElementById('edit-longDesc').value = watch.longDesc || '';
-            document.getElementById('edit-videoUrl').value = watch.videoUrl || '';
-            document.getElementById('edit-isSold').checked = watch.isSold || false;
-            
-            // Cargar estado de Oculto
-            document.getElementById('edit-isHidden').checked = watch.isHidden || false;
-
-            document.getElementById('edit-brand').value = watch.brand || '';
-            document.getElementById('edit-origin').value = watch.origin || '';
-            document.getElementById('edit-type').value = watch.type || '';
-            document.getElementById('edit-decade').value = watch.decade || '';
-
-            editModal.classList.remove('hidden');
-            editModal.classList.add('modal-enter');
-            editModalContent.classList.add('modal-content-enter');
-        }
-
-        function closeEditModal() {
-            editModal.classList.add('modal-leave');
-            editModalContent.classList.add('modal-content-leave');
-            editModal.addEventListener('animationend', () => {
-                editModal.classList.add('hidden');
-                editModal.classList.remove('modal-leave');
-                editModalContent.classList.remove('modal-content-leave');
-            }, { once: true });
-        }
-        
-        editModal.addEventListener('click', (e) => {
-            if (e.target.id === 'edit-modal' || e.target.closest('#modal-close-btn')) {
-                closeEditModal();
-            }
-        });
-
-        editForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            setEditLoading(true);
-
-            const docId = document.getElementById('edit-id').value;
-            
-            const updatedData = {
-                name: document.getElementById('edit-name').value,
-                price: document.getElementById('edit-price').value,
-                shortDesc: document.getElementById('edit-shortDesc').value,
-                longDesc: document.getElementById('edit-longDesc').value,
-                videoUrl: document.getElementById('edit-videoUrl').value,
-                isSold: document.getElementById('edit-isSold').checked,
+            // --- FUNCIÓN CARGAR RELOJES ---
+            function loadWatches() {
+                listLoader.classList.remove('hidden');
+                const q = query(collection(db, "watches"));
                 
-                // Guardar estado de Oculto
-                isHidden: document.getElementById('edit-isHidden').checked,
+                unsubscribeFromWatches = onSnapshot(q, (querySnapshot) => {
+                    listLoader.classList.add('hidden');
+                    watchListContainer.innerHTML = ''; 
+                    
+                    if (querySnapshot.empty) {
+                        watchListContainer.innerHTML = `<p class="text-gray-500 text-center">No se han encontrado relojes.</p>`;
+                        return;
+                    }
+                    querySnapshot.forEach((doc) => {
+                        const watch = { id: doc.id, ...doc.data() };
+                        watchListContainer.appendChild(createWatchRow(watch));
+                    });
+                }, (error) => {
+                    console.error("Firestore Error:", error);
+                    listLoader.classList.add('hidden');
+                    watchListContainer.innerHTML = `<p class="text-red-500">Error de conexión.</p>`;
+                });
+            }
+
+            function createWatchRow(watch) {
+                const div = document.createElement('div');
+                div.className = 'bg-white p-4 rounded-lg shadow-md flex items-center justify-between space-x-4';
                 
-                brand: document.getElementById('edit-brand').value,
-                origin: document.getElementById('edit-origin').value,
-                type: document.getElementById('edit-type').value,
-                decade: document.getElementById('edit-decade').value
+                let statusBadge = '';
+                if (watch.isHidden) {
+                    statusBadge = `<span class="text-xs font-medium bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full border border-yellow-200">Oculto</span>`;
+                } else if (watch.isSold) {
+                    statusBadge = `<span class="text-xs font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Vendido</span>`;
+                } else {
+                    statusBadge = `<span class="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">A la venta</span>`;
+                }
+
+                div.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-gray-900 truncate">${watch.name || 'Sin nombre'}</p>
+                        <p class="text-sm text-gray-500 truncate">${watch.price || 'Sin precio'}</p>
+                    </div>
+                    <div class="flex-shrink-0 flex items-center space-x-2">
+                        ${statusBadge}
+                        <button data-id="${watch.id}" class="image-btn p-2 text-gray-500 hover:text-purple-600" title="Imágenes">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l-1.586-1.586a2 2 0 00-2.828 0L6 14m6-6l.01.01"></path></svg>
+                        </button>
+                        <button data-id="${watch.id}" class="edit-btn p-2 text-gray-500 hover:text-blue-600" title="Editar">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        </button>
+                        <button data-id="${watch.id}" class="delete-btn p-2 text-gray-500 hover:text-red-600" title="Borrar">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                `;
+                return div;
+            }
+
+            // --- EVENTOS DE CLICK EN LISTA ---
+            watchListContainer.addEventListener('click', (e) => {
+                const editButton = e.target.closest('.edit-btn');
+                const deleteButton = e.target.closest('.delete-btn');
+                const imageButton = e.target.closest('.image-btn');
+
+                if (editButton) openEditModal(editButton.dataset.id);
+                if (deleteButton) openDeleteModal(deleteButton.dataset.id);
+                if (imageButton) openImageModal(imageButton.dataset.id);
+            });
+
+            // --- LÓGICA DE MODALES (Edit, Delete, Image) ---
+            setupModals();
+        }
+
+        function setupModals() {
+            // Elementos Modales
+            const editModal = document.getElementById('edit-modal');
+            const editForm = document.getElementById('edit-form');
+            const deleteModal = document.getElementById('delete-modal');
+            const imageModal = document.getElementById('image-modal');
+            const imageGrid = document.getElementById('image-grid');
+            
+            // --- EDIT MODAL ---
+            window.openEditModal = async (docId) => {
+                const docRef = doc(db, "watches", docId);
+                const snap = await getDoc(docRef);
+                if (!snap.exists()) return;
+                const watch = snap.data();
+
+                // Llenar formulario
+                document.getElementById('edit-id').value = docId;
+                document.getElementById('edit-name').value = watch.name || '';
+                document.getElementById('edit-price').value = watch.price || '';
+                document.getElementById('edit-folder').value = watch.mainImage ? watch.mainImage.split('/')[0] : ''; 
+                document.getElementById('edit-shortDesc').value = watch.shortDesc || '';
+                document.getElementById('edit-longDesc').value = watch.longDesc || '';
+                document.getElementById('edit-videoUrl').value = watch.videoUrl || '';
+                document.getElementById('edit-isSold').checked = watch.isSold || false;
+                document.getElementById('edit-isHidden').checked = watch.isHidden || false;
+                document.getElementById('edit-brand').value = watch.brand || '';
+                document.getElementById('edit-origin').value = watch.origin || '';
+                document.getElementById('edit-type').value = watch.type || '';
+                document.getElementById('edit-decade').value = watch.decade || '';
+
+                editModal.classList.remove('hidden');
             };
 
-            try {
-                const docRef = doc(db, "watches", docId);
-                await updateDoc(docRef, updatedData);
-                closeEditModal();
-            } catch (error) {
-                console.error("Error al actualizar el documento:", error);
-                alert("Error al actualizar. Revisa la consola."); 
-            } finally {
-                setEditLoading(false);
-            }
-        });
+            document.getElementById('modal-close-btn').addEventListener('click', () => editModal.classList.add('hidden'));
 
-        function setEditLoading(isLoading) {
-            const button = document.getElementById('edit-save-button');
-            if (isLoading) {
-                button.disabled = true;
-                editButtonText.classList.add('hidden');
-                editSpinner.classList.remove('hidden');
-            } else {
-                button.disabled = false;
-                editButtonText.classList.remove('hidden');
-                editSpinner.classList.add('hidden');
-            }
-        }
+            editForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('edit-save-button');
+                btn.disabled = true;
+                btn.textContent = "Guardando...";
 
-        // --- Borrado (Modal de Reloj) ---
-        function openDeleteModal(docId) {
-            currentDeleteId = docId;
-            deleteModal.classList.remove('hidden');
-            deleteModal.classList.add('modal-enter');
-        }
+                const docId = document.getElementById('edit-id').value;
+                const updatedData = {
+                    name: document.getElementById('edit-name').value,
+                    price: document.getElementById('edit-price').value,
+                    shortDesc: document.getElementById('edit-shortDesc').value,
+                    longDesc: document.getElementById('edit-longDesc').value,
+                    videoUrl: document.getElementById('edit-videoUrl').value,
+                    isSold: document.getElementById('edit-isSold').checked,
+                    isHidden: document.getElementById('edit-isHidden').checked,
+                    brand: document.getElementById('edit-brand').value,
+                    origin: document.getElementById('edit-origin').value,
+                    type: document.getElementById('edit-type').value,
+                    decade: document.getElementById('edit-decade').value
+                };
 
-        function closeDeleteModal() {
-            deleteModal.classList.add('modal-leave');
-            deleteModal.addEventListener('animationend', () => {
-                deleteModal.classList.add('hidden');
-                deleteModal.classList.remove('modal-leave');
-            }, { once: true });
-        }
-
-        deleteCancelButton.addEventListener('click', closeDeleteModal);
-        deleteModal.addEventListener('click', (e) => {
-            if (e.target.id === 'delete-modal') closeDeleteModal();
-        });
-
-        deleteConfirmButton.addEventListener('click', async () => {
-            if (currentDeleteId) {
                 try {
-                    const docRef = doc(db, "watches", currentDeleteId);
-                    await deleteDoc(docRef);
-                    currentDeleteId = null;
-                    closeDeleteModal();
+                    await updateDoc(doc(db, "watches", docId), updatedData);
+                    editModal.classList.add('hidden');
                 } catch (error) {
-                    console.error("Error al borrar el documento:", error);
-                    alert("Error al borrar. Revisa la consola.");
-                    currentDeleteId = null;
-                    closeDeleteModal();
-                }
-            }
-        });
-
-        // --- LÓGICA DE GESTIÓN DE IMÁGENES ---
-        async function openImageModal(docId) {
-            currentEditDocId = docId;
-            imageGrid.innerHTML = ''; 
-            imageModalLoader.classList.remove('hidden');
-            imageModal.classList.remove('hidden');
-            imageModal.classList.add('modal-enter');
-            imageModalContent.classList.add('modal-content-enter');
-
-            const docRef = doc(db, "watches", docId);
-            const snap = await getDoc(docRef);
-
-            if (!snap.exists()) {
-                console.error("No se encontró el documento");
-                closeImageModal();
-                return;
-            }
-            
-            const watch = snap.data();
-            const mainImagePath = watch.mainImage;
-            const galleryPaths = watch.gallery || [];
-            currentEditFolder = mainImagePath ? mainImagePath.split('/')[0] : 'default';
-            
-            // Combinar para mostrar miniaturas, pero distinguiremos cuál es cuál
-            const allImagePaths = [...new Set([mainImagePath, ...galleryPaths])].filter(p => p);
-
-            if (allImagePaths.length === 0) {
-                 imageGrid.innerHTML = `<p class="text-gray-500 col-span-full text-center">No hay imágenes cargadas.</p>`;
-                 imageModalLoader.classList.add('hidden');
-                 // Permitimos ver el modal vacío para que pueda subir imágenes
-                 return;
-            }
-
-            const imagePromises = allImagePaths.map(async (path) => {
-                try {
-                    const imgRef = ref(storage, path);
-                    const url = await getDownloadURL(imgRef);
-                    return { path, url, isMain: path === mainImagePath };
-                } catch (error) {
-                    console.warn(`No se pudo cargar la imagen: ${path}`, error);
-                    return { path, url: null, isMain: path === mainImagePath };
+                    console.error("Error update:", error);
+                    alert("Error al guardar.");
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Guardar Cambios";
                 }
             });
 
-            const images = await Promise.all(imagePromises);
-            imageModalLoader.classList.add('hidden');
-            imageGrid.innerHTML = ''; 
+            // --- DELETE MODAL ---
+            window.openDeleteModal = (docId) => {
+                currentDeleteId = docId;
+                deleteModal.classList.remove('hidden');
+            };
 
-            images.filter(img => img.url).forEach(img => {
-                imageGrid.appendChild(createImageThumbnail(img.path, img.url, img.isMain));
-            });
-        }
-
-        function createImageThumbnail(path, url, isMain) {
-            const div = document.createElement('div');
-            div.className = `relative group rounded-md overflow-hidden border-4 ${isMain ? 'border-blue-600 shadow-md' : 'border-transparent shadow-sm'}`;
+            document.getElementById('delete-cancel-btn').addEventListener('click', () => deleteModal.classList.add('hidden'));
             
-            const mainBadge = isMain ? `<span class="absolute top-1 left-1 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded shadow-sm z-10">PRINCIPAL</span>` : '';
-
-            div.innerHTML = `
-                <img src="${url}" alt="${path}" class="h-40 w-full object-cover">
-                ${mainBadge}
-                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center space-y-2 p-2">
-                    <button data-path="${path}" class="set-main-btn text-xs bg-white text-gray-900 px-3 py-1.5 rounded font-medium hover:bg-gray-100 ${isMain ? 'hidden' : ''}">Usar como Principal</button>
-                    <button data-path="${path}" class="delete-image-btn text-xs bg-red-600 text-white px-3 py-1.5 rounded font-medium hover:bg-red-700">Borrar</button>
-                </div>
-            `;
-            return div;
-        }
-
-        function closeImageModal() {
-            imageModal.classList.add('modal-leave');
-            imageModalContent.classList.add('modal-content-leave');
-            imageModal.addEventListener('animationend', () => {
-                imageModal.classList.add('hidden');
-                imageModal.classList.remove('modal-leave');
-                imageModalContent.classList.remove('modal-content-leave');
-            }, { once: true });
-        }
-
-        imageModal.addEventListener('click', (e) => {
-            if (e.target.id === 'image-modal' || e.target.closest('#image-modal-close-btn')) {
-                closeImageModal();
-            }
-        });
-
-        imageGrid.addEventListener('click', async (e) => {
-            const setMainBtn = e.target.closest('.set-main-btn');
-            const deleteBtn = e.target.closest('.delete-image-btn');
-
-            if (setMainBtn) {
-                const path = setMainBtn.dataset.path;
-                await setAsMainImage(path);
-            }
-            if (deleteBtn) {
-                const path = deleteBtn.dataset.path;
-                if (confirm(`¿Estás seguro de que quieres borrar la imagen?`)) {
-                     await deleteImage(path);
+            document.getElementById('delete-confirm-btn').addEventListener('click', async () => {
+                if (!currentDeleteId) return;
+                try {
+                    await deleteDoc(doc(db, "watches", currentDeleteId));
+                    deleteModal.classList.add('hidden');
+                } catch (error) {
+                    console.error("Error delete:", error);
+                    alert("Error al borrar.");
                 }
-            }
-        });
+            });
 
-        async function setAsMainImage(path) {
-            try {
-                const docRef = doc(db, "watches", currentEditDocId);
-                await updateDoc(docRef, { mainImage: path });
-                await openImageModal(currentEditDocId); 
-            } catch (error) {
-                console.error("Error al establecer imagen principal:", error);
-                alert("Error al actualizar la imagen principal.");
-            }
-        }
+            // --- IMAGE MODAL ---
+            window.openImageModal = async (docId) => {
+                currentEditDocId = docId;
+                imageGrid.innerHTML = '<p class="text-center w-full">Cargando...</p>';
+                imageModal.classList.remove('hidden');
 
-        async function deleteImage(path) {
-            try {
-                const imgRef = ref(storage, path);
-                await deleteObject(imgRef);
+                const snap = await getDoc(doc(db, "watches", docId));
+                if (!snap.exists()) return;
                 
-                const docRef = doc(db, "watches", currentEditDocId);
-                // Intentamos borrar de ambos lados por si acaso
-                await updateDoc(docRef, {
-                    gallery: arrayRemove(path) 
-                });
+                const watch = snap.data();
+                const mainImagePath = watch.mainImage;
+                const galleryPaths = watch.gallery || [];
+                currentEditFolder = mainImagePath ? mainImagePath.split('/')[0] : 'default';
+                
+                const allImagePaths = [...new Set([mainImagePath, ...galleryPaths])].filter(p => p);
 
-                const snap = await getDoc(docRef);
-                if (snap.data().mainImage === path) {
-                    await updateDoc(docRef, { mainImage: "" });
+                // Renderizar imágenes
+                imageGrid.innerHTML = '';
+                if (allImagePaths.length === 0) imageGrid.innerHTML = '<p>No hay imágenes.</p>';
+
+                for (const path of allImagePaths) {
+                    try {
+                        const url = await getDownloadURL(ref(storage, path));
+                        const isMain = path === mainImagePath;
+                        const div = document.createElement('div');
+                        div.className = `relative group rounded border-4 ${isMain ? 'border-blue-600' : 'border-transparent'}`;
+                        div.innerHTML = `
+                            <img src="${url}" class="h-32 w-full object-cover">
+                            ${isMain ? '<span class="absolute top-0 left-0 bg-blue-600 text-white text-xs px-1">PRINCIPAL</span>' : ''}
+                            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2">
+                                ${!isMain ? `<button class="text-xs bg-white px-2 py-1 rounded set-main" data-path="${path}">Principal</button>` : ''}
+                                <button class="text-xs bg-red-600 text-white px-2 py-1 rounded del-img" data-path="${path}">X</button>
+                            </div>
+                        `;
+                        imageGrid.appendChild(div);
+                    } catch (e) { console.warn("Error img:", e); }
                 }
+            };
 
-                await openImageModal(currentEditDocId);
-            } catch (error) {
-                console.error("Error al borrar la imagen:", error);
-                alert("Error al borrar la imagen.");
-            }
-        }
+            document.getElementById('image-modal-close-btn').addEventListener('click', () => imageModal.classList.add('hidden'));
 
-        // --- SUBIR IMÁGENES A LA GALERÍA ---
-        imageUploader.addEventListener('change', async (e) => {
-            const files = e.target.files;
-            if (files.length === 0) return;
-            
-            uploadSpinner.classList.remove('hidden');
-            
-            const uploadPromises = [];
-            const newPaths = [];
+            // Eventos dentro del Grid de Imágenes
+            imageGrid.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('set-main')) {
+                    const path = e.target.dataset.path;
+                    await updateDoc(doc(db, "watches", currentEditDocId), { mainImage: path });
+                    openImageModal(currentEditDocId); // Recargar
+                }
+                if (e.target.classList.contains('del-img')) {
+                    if(!confirm("¿Borrar imagen?")) return;
+                    const path = e.target.dataset.path;
+                    try {
+                        await deleteObject(ref(storage, path));
+                        await updateDoc(doc(db, "watches", currentEditDocId), { 
+                            gallery: arrayRemove(path) 
+                        });
+                        openImageModal(currentEditDocId);
+                    } catch (e) { alert("Error al borrar imagen: " + e.message); }
+                }
+            });
 
-            for (const file of files) {
+            // Subir nueva imagen
+            document.getElementById('image-uploader').addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
                 const newPath = `${currentEditFolder}/${file.name}`;
-                newPaths.push(newPath);
-                const imgRef = ref(storage, newPath);
-                uploadPromises.push(uploadBytes(imgRef, file));
-            }
-
-            try {
-                await Promise.all(uploadPromises); 
-
-                const docRef = doc(db, "watches", currentEditDocId);
-                await updateDoc(docRef, {
-                    gallery: arrayUnion(...newPaths)
-                });
-
-                await openImageModal(currentEditDocId);
-
-            } catch (error) {
-                 console.error("Error al subir nuevas imágenes:", error);
-                 alert("Error al subir imágenes.");
-            } finally {
-                 uploadSpinner.classList.add('hidden');
-                 imageUploader.value = ''; 
-            }
-        });
-
-        // --- NUEVO: SUBIR/CAMBIAR IMAGEN PRINCIPAL ---
-        mainImageUploader.addEventListener('change', async (e) => {
-            const file = e.target.files[0]; // Solo permitimos un archivo a la vez
-            if (!file) return;
-
-            mainUploadSpinner.classList.remove('hidden');
-
-            try {
-                // Usamos una convención de nombre para evitar caché o sobreescritura accidental
-                const newPath = `${currentEditFolder}/main_${Date.now()}_${file.name}`;
-                const imgRef = ref(storage, newPath);
-                
-                // 1. Subir la imagen
-                await uploadBytes(imgRef, file);
-
-                // 2. Actualizar el campo mainImage en Firestore
-                const docRef = doc(db, "watches", currentEditDocId);
-                await updateDoc(docRef, {
-                    mainImage: newPath
-                });
-
-                // 3. Recargar el modal para ver el cambio
-                await openImageModal(currentEditDocId);
-
-            } catch (error) {
-                console.error("Error al subir imagen principal:", error);
-                alert("Error al subir la imagen principal.");
-            } finally {
-                mainUploadSpinner.classList.add('hidden');
-                mainImageUploader.value = '';
-            }
-        });
-
+                try {
+                    await uploadBytes(ref(storage, newPath), file);
+                    await updateDoc(doc(db, "watches", currentEditDocId), { gallery: arrayUnion(newPath) });
+                    openImageModal(currentEditDocId);
+                } catch (e) { alert("Error subida: " + e.message); }
+            });
+        }
     </script>
 
     <div id="login-section" class="flex items-center justify-center min-h-screen bg-gray-900">
@@ -672,189 +454,82 @@
 
     <div id="edit-modal" class="fixed inset-0 z-40 flex items-center justify-center bg-black/70 hidden p-4">
         <div id="edit-modal-content" class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
-            <button id="modal-close-btn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-            
+            <button id="modal-close-btn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">X</button>
             <form id="edit-form" class="p-8 space-y-6">
                 <h3 class="text-2xl font-bold text-gray-900">Editar Reloj</h3>
                 <input type="hidden" id="edit-id">
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="edit-name" class="block text-sm font-medium text-gray-700">Nombre del Reloj</label>
-                        <input type="text" id="edit-name" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label for="edit-price" class="block text-sm font-medium text-gray-700">Precio</label>
-                        <input type="text" id="edit-price" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                    </div>
+                    <div><label class="block text-sm">Nombre</label><input type="text" id="edit-name" class="w-full border p-2 rounded"></div>
+                    <div><label class="block text-sm">Precio</label><input type="text" id="edit-price" class="w-full border p-2 rounded"></div>
                 </div>
-
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label for="edit-brand" class="block text-sm font-medium text-gray-700">Marca</label>
-                        <select id="edit-brand" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                            <option value="" disabled>Seleccione una marca</option>
-                            <option value="Seiko">Seiko</option>
-                            <option value="Citizen">Citizen</option>
-                            <option value="Orient">Orient</option>
-                            <option value="Casio">Casio</option>
-                            <option value="Enicar">Enicar</option>
-                            <option value="Zaira">Zaira</option>
-                            <option value="Seagull">Seagull</option>
-                            <option value="Otros">Otros</option>
+                        <label class="block text-sm">Marca</label>
+                        <select id="edit-brand" class="w-full border p-2 rounded">
+                            <option value="Seiko">Seiko</option><option value="Citizen">Citizen</option><option value="Orient">Orient</option><option value="Casio">Casio</option><option value="Enicar">Enicar</option><option value="Zaira">Zaira</option><option value="Seagull">Seagull</option><option value="Otros">Otros</option>
                         </select>
                     </div>
                     <div>
-                        <label for="edit-origin" class="block text-sm font-medium text-gray-700">País de Origen</label>
-                        <select id="edit-origin" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                            <option value="" disabled>Seleccione un origen</option>
-                            <option value="Japon">Japon</option>
-                            <option value="Suiza">Suiza</option>
-                            <option value="China">China</option>
-                            <option value="India">India</option>
-                            <option value="Rusia">Rusia</option>
-                            <option value="Otros">Otros</option>
+                        <label class="block text-sm">Origen</label>
+                        <select id="edit-origin" class="w-full border p-2 rounded">
+                            <option value="Japon">Japon</option><option value="Suiza">Suiza</option><option value="China">China</option><option value="India">India</option><option value="Rusia">Rusia</option><option value="Otros">Otros</option>
                         </select>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label for="edit-type" class="block text-sm font-medium text-gray-700">Tipo de Mecanismo</label>
-                        <select id="edit-type" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                            <option value="" disabled>Seleccione un tipo</option>
-                            <option value="Automatico">Automatico</option>
-                            <option value="Mecanico">Mecanico</option>
-                            <option value="Cuarzo">Cuarzo</option>
-                            <option value="Otros">Otros</option>
+                        <label class="block text-sm">Tipo</label>
+                        <select id="edit-type" class="w-full border p-2 rounded">
+                            <option value="Automatico">Automatico</option><option value="Mecanico">Mecanico</option><option value="Cuarzo">Cuarzo</option><option value="Otros">Otros</option>
                         </select>
                     </div>
                     <div>
-                        <label for="edit-decade" class="block text-sm font-medium text-gray-700">Década</label>
-                        <select id="edit-decade" required class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                            <option value="" disabled>Seleccione una década</option>
-                            <option value="1950s">1950s</option>
-                            <option value="1960s">1960s</option>
-                            <option value="1970s">1970s</option>
-                            <option value="1980s">1980s</option>
-                            <option value="1990s">1990s</option>
-                            <option value="2000s">2000s</option>
-                            <option value="2010s">2010s</option>
-                            <option value="2020s">2020s</option>
-                            <option value="Otros">Otros</option>
+                        <label class="block text-sm">Década</label>
+                        <select id="edit-decade" class="w-full border p-2 rounded">
+                            <option value="1950s">1950s</option><option value="1960s">1960s</option><option value="1970s">1970s</option><option value="1980s">1980s</option><option value="1990s">1990s</option><option value="2000s">2000s</option><option value="2010s">2010s</option><option value="2020s">2020s</option><option value="Otros">Otros</option>
                         </select>
                     </div>
                 </div>
 
-                <div>
-                    <label for="edit-folder" class="block text-sm font-medium text-gray-700">Carpeta en Storage (Solo lectura)</label>
-                    <input type="text" id="edit-folder" readonly class="w-full px-3 py-2 mt-1 bg-gray-100 border border-gray-300 rounded-md shadow-sm">
-                </div>
-                
-                <div>
-                    <label for="edit-shortDesc" class="block text-sm font-medium text-gray-700">Descripción Corta</label>
-                    <textarea id="edit-shortDesc" rows="2" class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                <div><label class="block text-sm">Carpeta (Solo lectura)</label><input type="text" id="edit-folder" readonly class="w-full bg-gray-100 border p-2 rounded"></div>
+                <div><label class="block text-sm">Desc. Corta</label><textarea id="edit-shortDesc" rows="2" class="w-full border p-2 rounded"></textarea></div>
+                <div><label class="block text-sm">Desc. Larga</label><textarea id="edit-longDesc" rows="4" class="w-full border p-2 rounded"></textarea></div>
+                <div><label class="block text-sm">Video URL</label><input type="text" id="edit-videoUrl" class="w-full border p-2 rounded"></div>
+
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center"><input id="edit-isSold" type="checkbox" class="mr-2"><label>Vendido</label></div>
+                    <div class="flex items-center"><input id="edit-isHidden" type="checkbox" class="mr-2"><label>Oculto</label></div>
                 </div>
 
-                <div>
-                    <label for="edit-longDesc" class="block text-sm font-medium text-gray-700">Descripción Larga</label>
-                    <textarea id="edit-longDesc" rows="4" class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
-                </div>
-
-                <div>
-                    <label for="edit-videoUrl" class="block text-sm font-medium text-gray-700">URL Video YouTube</label>
-                    <input type="text" id="edit-videoUrl" class="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                </div>
-
-                <div class="flex items-center mb-4">
-                    <input id="edit-isSold" type="checkbox" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    <label for="edit-isSold" class="ml-2 block text-sm font-medium text-gray-900">Marcar como Vendido</label>
-                </div>
-
-                <div class="flex items-center p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <input id="edit-isHidden" type="checkbox" class="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500">
-                    <label for="edit-isHidden" class="ml-2 block text-sm font-medium text-yellow-800">
-                        Ocultar (Modo Borrador)
-                        <span class="block text-xs text-gray-500 font-normal">No aparecerá en la página principal.</span>
-                    </label>
-                </div>
-
-                <div>
-                    <button id="edit-save-button" type="submit" class="w-full px-4 py-2 font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 flex items-center justify-center">
-                        <span id="edit-button-text">Guardar Cambios</span>
-                        <span id="edit-spinner" class="spinner hidden"></span>
-                    </button>
-                </div>
+                <button id="edit-save-button" type="submit" class="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">Guardar Cambios</button>
             </form>
         </div>
     </div>
 
     <div id="delete-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 hidden p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm">
-            <div class="p-6">
-                <h3 class="text-lg font-medium text-gray-900">Confirmar Borrado</h3>
-                <p class="mt-2 text-sm text-gray-500">¿Estás seguro de que quieres borrar este reloj? Esta acción no se puede deshacer. (Las imágenes en Storage no se borrarán).</p>
-            </div>
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button id="delete-confirm-btn" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 sm:ml-3 sm:w-auto sm:text-sm">
-                    Borrar
-                </button>
-                <button id="delete-cancel-btn" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm">
-                    Cancelar
-                </button>
+        <div class="bg-white rounded p-6 shadow-xl max-w-sm">
+            <h3 class="text-lg font-bold">¿Borrar Reloj?</h3>
+            <p class="text-sm text-gray-500 mt-2">Esta acción no se puede deshacer.</p>
+            <div class="mt-4 flex justify-end gap-3">
+                <button id="delete-cancel-btn" class="bg-gray-200 px-4 py-2 rounded">Cancelar</button>
+                <button id="delete-confirm-btn" class="bg-red-600 text-white px-4 py-2 rounded">Borrar</button>
             </div>
         </div>
     </div>
 
     <div id="image-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 hidden p-4">
-        <div id="image-modal-content" class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
-            <button id="image-modal-close-btn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
+        <div id="image-modal-content" class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative p-6">
+            <button id="image-modal-close-btn" class="absolute top-4 right-4 text-gray-500 font-bold text-xl">X</button>
+            <h3 class="text-2xl font-bold mb-4">Gestión de Imágenes</h3>
             
-            <div class="p-8">
-                <h3 class="text-2xl font-bold text-gray-900 mb-6">Administrar Imágenes</h3>
-                
-                <div class="mb-6 p-5 bg-blue-50 rounded-lg border border-blue-200">
-                    <label for="main-image-uploader" class="block text-base font-semibold text-blue-800 mb-2">
-                        <svg class="w-5 h-5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        Cambiar Imagen Principal (Portada)
-                    </label>
-                    <p class="text-sm text-blue-600 mb-3">Sube una nueva foto aquí y se establecerá automáticamente como la imagen principal del reloj.</p>
-                    <div class="flex items-center space-x-3">
-                        <input type="file" id="main-image-uploader" accept="image/*" class="block w-full text-sm text-slate-500
-                          file:mr-4 file:py-2 file:px-4
-                          file:rounded-full file:border-0
-                          file:text-sm file:font-semibold
-                          file:bg-blue-600 file:text-white
-                          hover:file:bg-blue-700
-                        ">
-                        <div id="main-upload-spinner" class="spinner-small hidden text-blue-600"></div>
-                    </div>
-                </div>
-
-                <div class="mb-4 p-5 bg-gray-50 rounded-lg border border-gray-200">
-                    <label for="image-uploader" class="block text-sm font-medium text-gray-700 mb-2">Subir imágenes adicionales a la galería</label>
-                    <div class="flex items-center space-x-2">
-                        <input type="file" id="image-uploader" accept="image/*" multiple class="block w-full text-sm text-slate-500
-                          file:mr-4 file:py-2 file:px-4
-                          file:rounded-full file:border-0
-                          file:text-sm file:font-semibold
-                          file:bg-gray-200 file:text-gray-700
-                          hover:file:bg-gray-300">
-                        <div id="upload-spinner" class="spinner-small hidden"></div>
-                    </div>
-                </div>
-
-                <div id="image-modal-loader" class="text-center py-10">
-                    <div class="spinner spinner-dark mx-auto"></div>
-                    <p class="text-gray-500 mt-2">Cargando imágenes...</p>
-                </div>
-                
-                <div id="image-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    </div>
+            <div class="mb-4 bg-gray-100 p-4 rounded">
+                <label class="block text-sm font-bold mb-2">Subir Nueva Imagen</label>
+                <input type="file" id="image-uploader" class="block w-full text-sm">
             </div>
+
+            <div id="image-grid" class="grid grid-cols-3 gap-4">
+                </div>
         </div>
     </div>
 

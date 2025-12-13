@@ -63,7 +63,7 @@
         /* Estilos para el Crossfade de Video */
         .video-layer {
             position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-            transition: opacity 1s ease-in-out; /* Transición suave de 1 segundo */
+            transition: opacity 1s ease-in-out; 
         }
         .video-hidden { opacity: 0; z-index: -10; }
         .video-visible { opacity: 1; z-index: -5; }
@@ -194,8 +194,7 @@
             // 📝 CONFIGURACIÓN: Lista de Videos
             const playlistFiles = [
                 'video1.mp4', 
-                 'test3.mp4', // <--- Agrega aquí tus otros videos
-                // 'video3.mp4'
+                'test3.mp4',
             ];
 
             const player1 = document.getElementById('video-player-1');
@@ -267,7 +266,7 @@
         });
         // ---------------------------------------------------
 
-        // --- INICIO DE LÓGICA FIREBASE (Sin cambios) ---
+        // --- INICIO DE LÓGICA FIREBASE (INTELIGENTE Y UNIFICADA) ---
         let watchesData = []; 
         const signedUrlCache = new Map();
         let currentGroupingKey = 'origin';
@@ -275,46 +274,38 @@
         let db; 
         let getSignedUrlFunctionUrl;
 
-        // INICIALIZACIÓN INTELIGENTE
         (async function init() {
             try {
-                // 1. DETECCIÓN DE ENTORNO
-                const hostname = window.location.hostname;
-                const isSandboxEnv = hostname === "localhost" || 
-                                     hostname.includes("127.0.0.1") || 
-                                     hostname.includes("sbx-relojes-web");
-
-                let firebaseConfig;
-
-                if (isSandboxEnv) {
-                    console.log("🛠️ Modo: Sandbox (Manual)");
-                    firebaseConfig = {
-                        apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
-                        authDomain: "sbx-relojes-web.firebaseapp.com",
-                        projectId: "sbx-relojes-web",
-                        storageBucket: "sbx-relojes-web.firebasestorage.app",
-                        messagingSenderId: "326032897645",
-                        appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
-                    };
-                    getSignedUrlFunctionUrl = 'https://us-central1-sbx-relojes-web.cloudfunctions.net/getSignedUrl';
-                } else {
-                    console.log("☁️ Modo: Producción (Auto)");
-                    const response = await fetch('/__/firebase/init.json');
-                    if (!response.ok) throw new Error("Error cargando config");
-                    firebaseConfig = await response.json();
-                    
-                    getSignedUrlFunctionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/getSignedUrl`;
+                // 1. Detección Inteligente de Configuración
+                // Intentamos cargar la config automática de Firebase Hosting
+                // Esto funciona tanto en Sandbox como en Producción si el sitio está desplegado
+                const response = await fetch('/__/firebase/init.json');
+                
+                if (!response.ok) {
+                    throw new Error("No se pudo cargar la configuración automática. Asegúrate de estar en un entorno desplegado (deploy).");
                 }
 
-                // Inicializar Firebase
+                // Aquí obtenemos la configuración REAL del proyecto actual (sea Sandbox o Prod)
+                // sin tener nada escrito en el código ("hardcoded").
+                const firebaseConfig = await response.json();
+                
+                console.log(`✅ Conectado al proyecto: ${firebaseConfig.projectId}`);
+
+                // 2. Configuración Dinámica de la Cloud Function
+                // Construimos la URL usando el ID del proyecto que acabamos de detectar
+                getSignedUrlFunctionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/getSignedUrl`;
+
+                // 3. Inicializar Firebase
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app, "relojes");
 
-                // Cargar datos
+                // 4. Cargar datos
                 loadData();
 
             } catch (error) {
-                console.error("Error crítico:", error);
+                console.error("Error crítico de inicialización:", error);
+                const container = document.getElementById('gallery-container');
+                if(container) container.innerHTML = `<p class="text-red-600 text-center p-4">Error de conexión: ${error.message}</p>`;
             }
         })();
 

@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Aplica a todos los archivos dentro del Storage
+    match /{allPaths=**} {
+      
+      // Todo el mundo puede ver las fotos (necesario para que carguen en la web)
+      allow read: if true;
+
+      // Solo el administrador puede subir o borrar fotos
+      // (Reemplaza con tu correo real de admin)
+      allow write: if request.auth != null && request.auth.token.email == 'javier.tapia.r@gmail.com';
+    }
+  }
+}
