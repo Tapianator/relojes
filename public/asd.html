@@ -43,7 +43,7 @@
             apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OC8PG4ClleCxQ",
             authDomain: "sbx-relojes-web.firebaseapp.com",
             projectId: "sbx-relojes-web",
-            storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c", 
+            storageBucket: "sbx-relojes-web.firebasestorage.app", 
             messagingSenderId: "326032897645",
             appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
         };
@@ -193,8 +193,8 @@
                 };
 
                 // 4. Guardar en Firestore
-                console.log(`DEBUG: Intentando guardar datos en Firestore, colección 'wathces'`);
-                const docRef = await addDoc(collection(db, "wathces"), watchData);
+                console.log(`DEBUG: Intentando guardar datos en Firestore, colección 'watches'`);
+                const docRef = await addDoc(collection(db, "watches"), watchData);
                 console.log(`DEBUG: ¡Éxito! Documento creado con ID: ${docRef.id}`);
                 
                 showMessage("¡Reloj guardado con éxito!", false);

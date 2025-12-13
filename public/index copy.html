@@ -59,35 +59,9 @@
         #zoom-modal { background-color: rgba(0, 0, 0, 0.95); }
         #zoom-modal img { max-height: 90vh; max-width: 90vw; object-fit: contain; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .gallery-image-container:hover .hover-overlay { opacity: 1; }
-
-        /* CONSOLA DE DEBUG EN PANTALLA */
-        #screen-console {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 150px;
-            background-color: rgba(0, 0, 0, 0.85);
-            color: #00ff00;
-            font-family: monospace;
-            font-size: 12px;
-            padding: 10px;
-            overflow-y: auto;
-            z-index: 9999;
-            border-top: 2px solid #00ff00;
-            display: none; /* Se activa si hay errores o por defecto para debug */
-        }
-        #screen-console p { margin: 2px 0; border-bottom: 1px solid #333; }
-        .log-error { color: #ff4444 !important; font-weight: bold; }
-        .log-warn { color: #ffcc00 !important; }
-        .log-success { color: #00ff00 !important; }
     </style>
 </head>
 <body class="text-gray-900">
-
-    <div id="screen-console">
-        <p style="color:white; font-weight:bold;">--- CONSOLA DE DIAGNÓSTICO (Nayra Pacha) ---</p>
-    </div>
 
     <header class="bg-[#f7f3e8]/80 backdrop-blur-sm sticky top-0 z-40 border-b border-[#ddcca6]">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -166,8 +140,14 @@
         <section id="contact" class="py-20 bg-[#ddcca6]">
             <div class="container mx-auto px-4 text-center">
                 <h2 class="text-3xl font-bold mb-4 text-gray-900">¿Interesado en una pieza?</h2>
+                <p class="text-gray-700 max-w-xl mx-auto mb-8">Contáctanos para consultas o para coordinar tu compra.</p>
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-                    <a href="#" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg shadow-md">Contactar</a>
+                    <a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20uno%20de%20sus%20relojes." target="_blank" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center shadow-md w-full sm:w-auto">
+                        Contactar por WhatsApp
+                    </a>
+                    <a href="https://instagram.com/TU_USUARIO" target="_blank" class="bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 hover:opacity-90 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 inline-flex items-center shadow-md w-full sm:w-auto">
+                        Seguir en Instagram
+                    </a>
                 </div>
             </div>
         </section>
@@ -198,22 +178,6 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        
-        // --- FUNCIÓN DE LOG VISUAL (Súper importante para debuggear en deploy) ---
-        function screenLog(msg, type = 'info') {
-            const consoleDiv = document.getElementById('screen-console');
-            // Mostramos la consola si no estaba visible
-            consoleDiv.style.display = 'block';
-            
-            const p = document.createElement('p');
-            const time = new Date().toLocaleTimeString();
-            p.innerText = `[${time}] ${msg}`;
-            if (type === 'error') p.classList.add('log-error');
-            if (type === 'success') p.classList.add('log-success');
-            consoleDiv.appendChild(p);
-            consoleDiv.scrollTop = consoleDiv.scrollHeight;
-            console.log(msg); // También al console normal
-        }
 
         // --- INICIO DE LÓGICA ---
         let watchesData = []; 
@@ -223,54 +187,79 @@
         let db; 
         let getSignedUrlFunctionUrl;
 
-        try {
-            screenLog("🚀 Iniciando script...", 'info');
+        // INICIALIZACIÓN INTELIGENTE
+        (async function init() {
+            try {
+                // 1. DETECCIÓN DE ENTORNO
+                const hostname = window.location.hostname;
+                const isSandboxEnv = hostname === "localhost" || 
+                                     hostname.includes("127.0.0.1") || 
+                                     hostname.includes("sbx-relojes-web");
 
-            // 1. DETECCIÓN DE ENTORNO (CORREGIDA PARA TU DEPLOY)
-            const hostname = window.location.hostname;
-            screenLog(`📍 Host detectado: ${hostname}`, 'info');
+                let firebaseConfig;
 
-            // AQUÍ ESTÁ EL CAMBIO CLAVE:
-            // Consideramos "Sandbox" si es Localhost O SI ES tu dominio de pruebas 'sbx-relojes-web'
-            const isSandboxEnv = hostname === "localhost" || 
-                                 hostname.includes("127.0.0.1") || 
-                                 hostname.includes("sbx-relojes-web"); // <-- ESTO FALTABA
+                if (isSandboxEnv) {
+                    console.log("🛠️ Modo: Sandbox (Manual)");
+                    firebaseConfig = {
+                        apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
+                        authDomain: "sbx-relojes-web.firebaseapp.com",
+                        projectId: "sbx-relojes-web",
+                        storageBucket: "sbx-relojes-web.firebasestorage.app",
+                        messagingSenderId: "326032897645",
+                        appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
+                    };
+                    getSignedUrlFunctionUrl = 'https://us-central1-sbx-relojes-web.cloudfunctions.net/getSignedUrl';
+                } else {
+                    console.log("☁️ Modo: Producción (Auto)");
+                    const response = await fetch('/__/firebase/init.json');
+                    if (!response.ok) throw new Error("Error cargando config");
+                    firebaseConfig = await response.json();
+                    
+                    getSignedUrlFunctionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/getSignedUrl`;
+                }
 
-            let firebaseConfig;
+                // Inicializar Firebase
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app, "relojes");
 
-            if (isSandboxEnv) {
-                screenLog("🛠️ MODO: SANDBOX (Local o Cloud Testing) ACTIVADO.", 'success');
-                // Usamos las credenciales 'duras' que sabemos que funcionan
-                firebaseConfig = {
-                    apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
-                    authDomain: "sbx-relojes-web.firebaseapp.com",
-                    projectId: "sbx-relojes-web",
-                    storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c",
-                    messagingSenderId: "326032897645",
-                    appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
-                };
-                getSignedUrlFunctionUrl = 'https://us-central1-sbx-relojes-web.cloudfunctions.net/getSignedUrl';
-            } else {
-                // SOLO entra aquí si NO es localhost y NO es tu proyecto sbx (ej. www.tuempresa.com real)
-                screenLog("☁️ MODO: PRODUCCIÓN REAL detectado. Buscando configuración automática...", 'warn');
-                const response = await fetch('/__/firebase/init.json');
-                if (!response.ok) throw new Error(`Fallo init.json: ${response.status}`);
-                firebaseConfig = await response.json();
-                screenLog(`✅ Configuración obtenida para: ${firebaseConfig.projectId}`, 'success');
-                getSignedUrlFunctionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/getSignedUrl`;
+                // Cargar datos
+                loadData();
+
+            } catch (error) {
+                console.error("Error crítico:", error);
             }
-
-            // Inicializar Firebase
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app, "relojes");
-            screenLog("✅ Firebase inicializado.", 'success');
-
-        } catch (error) {
-            screenLog(`❌ ERROR FATAL DE CONFIG: ${error.message}`, 'error');
-        }
-
+        })();
 
         // --- FUNCIONES Y CARGA ---
+        async function loadData() {
+            const galleryContainer = document.getElementById('gallery-container');
+            const loader = document.getElementById('loader');
+            
+            try {
+                if (!db) throw new Error("DB no inicializada.");
+                
+                const querySnapshot = await getDocs(collection(db, "watches"));
+
+                if (querySnapshot.empty) { 
+                    if(loader) loader.style.display = 'none';
+                    galleryContainer.innerHTML = `<p class="text-yellow-700">No hay relojes cargados.</p>`; 
+                    return; 
+                }
+                
+                watchesData = querySnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(watch => !watch.isHidden);
+
+                renderGroupView();
+                setupListeners();
+
+            } catch (error) {
+                console.error("Error cargando datos:", error);
+                if(loader) loader.style.display = 'none';
+                galleryContainer.innerHTML = `<p class="text-red-700">Error al cargar la galería.</p>`;
+            }
+        }
+
         async function getSignedUrl(filePath) {
             if (!filePath) return 'https://placehold.co/600x600?text=No+Image';
             if (signedUrlCache.has(filePath)) return signedUrlCache.get(filePath); 
@@ -310,7 +299,8 @@
             const groupTitle = document.getElementById('group-title');
             const filterBar = document.getElementById('filter-bar'); 
             const loader = document.getElementById('loader');
-            if(loader) loader.style.display = 'none'; // Quitar loader
+            
+            if(loader) loader.style.display = 'none';
 
             galleryContainer.innerHTML = ''; 
             galleryContainer.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8'; 
@@ -390,95 +380,142 @@
             }
         }
 
-        // --- DOM LOAD ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            screenLog("📅 DOM Listo. Iniciando carga de datos...", 'info');
-            const galleryContainer = document.getElementById('gallery-container');
+        function setupListeners() {
             const groupBySelect = document.getElementById('group-by-select');
             const filterBar = document.getElementById('filter-bar');
+            const galleryContainer = document.getElementById('gallery-container');
+
+            if (groupBySelect) { groupBySelect.addEventListener('change', (e) => { currentGroupingKey = e.target.value; renderGroupView(); }); }
+            filterBar.addEventListener('click', (e) => { if (e.target.closest('#back-to-groups-btn')) renderGroupView(); });
             
-            try {
-                if (!db) throw new Error("DB no inicializada.");
-                
-                screenLog("⏳ Conectando a Firestore (colección 'wathces')...", 'info');
-                const querySnapshot = await getDocs(collection(db, "wathces"));
-                screenLog(`📡 Docs descargados: ${querySnapshot.size}`, 'success');
-
-                if (querySnapshot.empty) { 
-                    document.getElementById('loader').style.display = 'none'; 
-                    galleryContainer.innerHTML = `<p class="text-yellow-700">No hay relojes cargados.</p>`; 
-                    return; 
-                }
-                
-                watchesData = querySnapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter(watch => !watch.isHidden);
-
-                screenLog(`👀 Relojes visibles tras filtro: ${watchesData.length}`, 'success');
-                
-                renderGroupView();
-
-                // Listeners
-                if (groupBySelect) { groupBySelect.addEventListener('change', (e) => { currentGroupingKey = e.target.value; renderGroupView(); }); }
-                filterBar.addEventListener('click', (e) => { if (e.target.closest('#back-to-groups-btn')) renderGroupView(); });
-                
-                galleryContainer.addEventListener('click', (e) => {
-                    if (currentView === 'groups') {
-                        const groupCard = e.target.closest('.group-card');
-                        if (groupCard) renderItemView(groupCard.dataset.groupName);
-                    } else if (currentView === 'items') {
-                        let triggerElement = e.target.closest('.view-details-btn') || e.target.closest('.image-trigger');
-                        if (triggerElement) {
-                            const selectedWatch = watchesData.find(w => w.id === triggerElement.dataset.id);
-                            if (selectedWatch) openModal(selectedWatch);
-                        }
+            galleryContainer.addEventListener('click', (e) => {
+                if (currentView === 'groups') {
+                    const groupCard = e.target.closest('.group-card');
+                    if (groupCard) renderItemView(groupCard.dataset.groupName);
+                } else if (currentView === 'items') {
+                    let triggerElement = e.target.closest('.view-details-btn') || e.target.closest('.image-trigger');
+                    if (triggerElement) {
+                        const selectedWatch = watchesData.find(w => w.id === triggerElement.dataset.id);
+                        if (selectedWatch) openModal(selectedWatch);
                     }
-                });
+                }
+            });
+        }
 
-            } catch (error) {
-                screenLog(`❌ Error en Carga Principal: ${error.message}`, 'error');
-                document.getElementById('loader').style.display = 'none';
-                galleryContainer.innerHTML = `<p style="color:red; font-weight:bold;">Error: ${error.message}</p>`;
-            }
-
-            // --- LÓGICA MODAL (Resumida para brevedad, igual a funcional) ---
-            async function openModal(watch) {
+        async function openModal(watch) {
                 const modalContent = document.getElementById('modal-content');
                 modalContent.innerHTML = `<div class="flex justify-center items-center p-8 h-64"><div class="loader"></div></div>`;
+                
                 const modal = document.getElementById('modal');
                 modal.classList.remove('hidden');
                 document.body.style.overflow = 'hidden';
 
-                let allImagePaths = [watch.mainImage || watch.mainimage];
+                let allImagePaths = [];
+                const mainImgPath = watch.mainImage || watch.mainimage;
+                if (mainImgPath) allImagePaths.push(mainImgPath);
                 if (watch.gallery && Array.isArray(watch.gallery)) {
-                    allImagePaths = allImagePaths.concat(watch.gallery.filter(path => path !== allImagePaths[0]));
+                    const galleryPaths = watch.gallery.filter(path => path !== mainImgPath);
+                    allImagePaths = allImagePaths.concat(galleryPaths);
                 }
                 const allImageUrls = await Promise.all(allImagePaths.map(getSignedUrl));
+
+                const galleryHtml = allImageUrls.map((url, index) => `
+                    <div class="aspect-video cursor-zoom-in group rounded-md overflow-hidden border border-[#ddcca6] relative gallery-image-container shadow-sm">
+                        <img src="${url}" alt="Vista ${index + 1} de ${watch.name}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                        <div class="hover-overlay absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 transition-opacity duration-300 pointer-events-none">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                             </svg>
+                        </div>
+                    </div>
+                `).join(''); 
                 
-                // ... (Generación del HTML del modal idéntica a tu versión funcional)
-                // Para ahorrar espacio aquí, asumo que usas la misma lógica de renderizado del modal que ya tenías
-                // Pero si la necesitas completa dímelo. He puesto el esqueleto funcional aquí.
-                
-                // HTML simplificado para test:
-                const galleryHtml = allImageUrls.map(url => `<img src="${url}" class="w-full h-auto mb-2 rounded">`).join('');
+                const videoHtml = watch.videoUrl ? `<div class="mt-6 pt-6 border-t border-[#ddcca6]/50"><h4 class="text-xl font-semibold mb-4 text-gray-900 flex items-center"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>Video del Reloj</h4><div class="aspect-w-16 aspect-h-9shadow-sm"><iframe class="rounded-lg border border-[#ddcca6]" src="${watch.videoUrl}" frameborder="0" allowfullscreen></iframe></div></div>` : '';
+                const buyButton = watch.isSold ? `<div class="w-full bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg text-center shadow-md uppercase tracking-wider">Vendido</div>` : `<a href="https://wa.me/56912345678?text=Hola,%20estoy%20interesado%20en%20el%20reloj%20${encodeURIComponent(watch.name)}." target="_blank" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition inline-flex items-center justify-center shadow-md hover:shadow-lg">Comprar por WhatsApp</a>`;
+
                 modalContent.innerHTML = `
-                    <button id="close-modal-btn" class="absolute top-4 right-4 bg-white p-2 rounded-full">X</button>
-                    <div class="p-8">
-                        <h2 class="text-3xl font-bold mb-4">${watch.name}</h2>
-                        <p class="mb-4">${watch.longDesc || watch.shortDesc}</p>
-                        <div class="grid grid-cols-1 gap-4">${galleryHtml}</div>
+                    <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-700 hover:text-gray-900 z-20 bg-white/80 backdrop-blur rounded-full p-1 hover:bg-white transition shadow-sm">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    
+                    <div class="p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="relative bg-[#f7f3e8] rounded-lg p-6 overflow-hidden shadow-inner border border-[#ddcca6]">
+                            <div class="absolute inset-0 z-0 opacity-[0.07] pointer-events-none mix-blend-multiply" 
+                                style="background-image: url('imagenes/logo_full.svg'); background-size: contain; background-repeat: no-repeat; background-position: center;">
+                            </div>
+
+                            <div class="relative z-10">
+                                <div class="flex flex-col sm:flex-row justify-between items-start gap-3 mb-5 border-b-2 border-[#ddcca6] pb-3">
+                                    <h3 class="text-3xl font-bold text-gray-900 font-serif leading-tight">${watch.name || "Sin nombre"}</h3>
+                                    <button onclick="document.getElementById('gallery-section').scrollIntoView({ behavior: 'smooth' })" 
+                                            class="shrink-0 text-sm bg-white/60 hover:bg-[#ddcca6] border border-[#ddcca6] text-gray-800 px-3 py-1.5 rounded-full transition flex items-center gap-2 cursor-pointer shadow-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        Ver Galería
+                                    </button>
+                                </div>
+                                <p class="text-gray-800 mb-8 text-base leading-relaxed text-justify font-medium pr-2">
+                                    ${watch.longDesc || "Sin descripción."}
+                                </p>
+                                <div class="mt-4 p-5 bg-[#ebe4cd]/60 rounded-lg border border-[#ddcca6] shadow-sm mb-6">
+                                    <span class="text-xs text-gray-600 uppercase tracking-widest block mb-1 font-semibold">Precio</span>
+                                    <span class="text-3xl font-bold text-gray-900">${watch.price || "Consultar"}</span>
+                                </div>
+                                <div>${buyButton}</div>
+                            </div>
+                        </div>
+
+                        <div id="gallery-section" class="space-y-6 pt-2">
+                            <h4 class="text-xl font-semibold text-gray-900 mb-4 flex items-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Galería de Imágenes <span class="text-sm font-normal text-gray-500 ml-2">(Clic para ampliar)</span></h4>
+                            <div class="grid grid-cols-1 gap-4" id="modal-gallery-grid">
+                                ${galleryHtml}
+                            </div>
+                            ${videoHtml}
+                        </div>
                     </div>
                 `;
-            }
-             document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('#close-modal-btn')) closeModal(); });
-             function closeModal() {
-                const modal = document.getElementById('modal');
-                modal.classList.add('hidden');
-                document.body.style.overflow = 'auto';
-            }
-        });
 
-        window.closeZoomModal = () => { document.getElementById('zoom-modal').classList.add('hidden'); }
+                const galleryImages = modalContent.querySelectorAll('.gallery-image-container img');
+                galleryImages.forEach(img => {
+                    img.addEventListener('click', () => {
+                        openZoomModal(img.getAttribute('src'));
+                    });
+                });
+            }
+
+            document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal' || e.target.closest('#close-modal-btn')) closeModal(); });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!document.getElementById('zoom-modal').classList.contains('hidden')) { closeZoomModal(); } else if (!document.getElementById('modal').classList.contains('hidden')) { closeModal(); }} });
+
+            function closeModal() {
+                const modal = document.getElementById('modal');
+                const modalContent = document.getElementById('modal-content');
+                modal.classList.add('modal-leave');
+                modalContent.classList.add('modal-content-leave');
+                modal.addEventListener('animationend', () => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('modal-leave');
+                    modalContent.classList.remove('modal-content-leave');
+                    document.body.style.overflow = 'auto';
+                }, { once: true });
+            }
+
+        window.openZoomModal = (url) => {
+            const zoomModal = document.getElementById('zoom-modal');
+            const zoomedImage = document.getElementById('zoomed-image');
+            zoomedImage.src = url;
+            zoomModal.classList.remove('hidden');
+        }
+
+        window.closeZoomModal = () => {
+             const zoomModal = document.getElementById('zoom-modal');
+             zoomModal.classList.add('modal-leave');
+             zoomModal.addEventListener('animationend', () => {
+                zoomModal.classList.add('hidden');
+                zoomModal.classList.remove('modal-leave');
+                document.getElementById('zoomed-image').src = ''; 
+            }, { once: true });
+        }
     </script>
 </body>
 </html>

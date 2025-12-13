@@ -88,7 +88,7 @@
                 apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
                 authDomain: "sbx-relojes-web.firebaseapp.com",
                 projectId: "sbx-relojes-web",
-                storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c",
+                storageBucket: "sbx-relojes-web.firebasestorage.app",
                 messagingSenderId: "326032897645",
                 appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
             };
@@ -201,7 +201,7 @@
         // --- LÓGICA DE CARGAR/MOSTRAR RELOJES ---
         function loadWatches() {
             listLoader.classList.remove('hidden');
-            const q = query(collection(db, "wathces"));
+            const q = query(collection(db, "watches"));
             
             unsubscribeFromWatches = onSnapshot(q, (querySnapshot) => {
                 listLoader.classList.add('hidden');
@@ -279,7 +279,7 @@
 
         // --- Edición (Modal de Texto) ---
         async function openEditModal(docId) {
-            const docRef = doc(db, "wathces", docId);
+            const docRef = doc(db, "watches", docId);
             const snap = await getDoc(docRef);
 
             if (!snap.exists()) {
@@ -350,7 +350,7 @@
             };
 
             try {
-                const docRef = doc(db, "wathces", docId);
+                const docRef = doc(db, "watches", docId);
                 await updateDoc(docRef, updatedData);
                 closeEditModal();
             } catch (error) {
@@ -397,7 +397,7 @@
         deleteConfirmButton.addEventListener('click', async () => {
             if (currentDeleteId) {
                 try {
-                    const docRef = doc(db, "wathces", currentDeleteId);
+                    const docRef = doc(db, "watches", currentDeleteId);
                     await deleteDoc(docRef);
                     currentDeleteId = null;
                     closeDeleteModal();
@@ -419,7 +419,7 @@
             imageModal.classList.add('modal-enter');
             imageModalContent.classList.add('modal-content-enter');
 
-            const docRef = doc(db, "wathces", docId);
+            const docRef = doc(db, "watches", docId);
             const snap = await getDoc(docRef);
 
             if (!snap.exists()) {
@@ -514,7 +514,7 @@
 
         async function setAsMainImage(path) {
             try {
-                const docRef = doc(db, "wathces", currentEditDocId);
+                const docRef = doc(db, "watches", currentEditDocId);
                 await updateDoc(docRef, { mainImage: path });
                 await openImageModal(currentEditDocId); 
             } catch (error) {
@@ -528,7 +528,7 @@
                 const imgRef = ref(storage, path);
                 await deleteObject(imgRef);
                 
-                const docRef = doc(db, "wathces", currentEditDocId);
+                const docRef = doc(db, "watches", currentEditDocId);
                 // Intentamos borrar de ambos lados por si acaso
                 await updateDoc(docRef, {
                     gallery: arrayRemove(path) 
@@ -566,7 +566,7 @@
             try {
                 await Promise.all(uploadPromises); 
 
-                const docRef = doc(db, "wathces", currentEditDocId);
+                const docRef = doc(db, "watches", currentEditDocId);
                 await updateDoc(docRef, {
                     gallery: arrayUnion(...newPaths)
                 });
@@ -598,7 +598,7 @@
                 await uploadBytes(imgRef, file);
 
                 // 2. Actualizar el campo mainImage en Firestore
-                const docRef = doc(db, "wathces", currentEditDocId);
+                const docRef = doc(db, "watches", currentEditDocId);
                 await updateDoc(docRef, {
                     mainImage: newPath
                 });

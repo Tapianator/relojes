@@ -59,6 +59,14 @@
         #zoom-modal { background-color: rgba(0, 0, 0, 0.95); }
         #zoom-modal img { max-height: 90vh; max-width: 90vw; object-fit: contain; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .gallery-image-container:hover .hover-overlay { opacity: 1; }
+        
+        /* Estilos para el Crossfade de Video */
+        .video-layer {
+            position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+            transition: opacity 1s ease-in-out; /* Transición suave de 1 segundo */
+        }
+        .video-hidden { opacity: 0; z-index: -10; }
+        .video-visible { opacity: 1; z-index: -5; }
     </style>
 </head>
 <body class="text-gray-900">
@@ -84,9 +92,11 @@
 
     <main>
         <section id="hero" class="relative h-[60vh] md:h-[80vh] flex items-center justify-center text-center overflow-hidden">
-             <video autoplay loop muted playsinline class="absolute inset-0 w-full h-full object-cover -z-10">
-                 <source src="video/test.mp4" type="video/mp4">
-             </video>
+             <div id="video-container">
+                 <video id="video-player-1" class="video-layer video-visible" muted playsinline></video>
+                 <video id="video-player-2" class="video-layer video-hidden" muted playsinline></video>
+             </div>
+             
              <div class="absolute inset-0 bg-black/50"></div>
              <div class="relative z-10 px-4">
                 <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-4">Elegancia Atemporal</h1>
@@ -179,7 +189,85 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        // --- INICIO DE LÓGICA ---
+        // --- SISTEMA DE VIDEO DOBLE BUFFER (Cero Pestañeo) ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 📝 CONFIGURACIÓN: Lista de Videos
+            const playlistFiles = [
+                'video1.mp4', 
+                 'test3.mp4', // <--- Agrega aquí tus otros videos
+                // 'video3.mp4'
+            ];
+
+            const player1 = document.getElementById('video-player-1');
+            const player2 = document.getElementById('video-player-2');
+
+            if (!player1 || !player2 || playlistFiles.length === 0) return;
+
+            // Caso Especial: Si solo hay 1 video, usamos loop nativo (máxima eficiencia)
+            if (playlistFiles.length === 1) {
+                player1.src = `video/${playlistFiles[0]}`;
+                player1.loop = true;
+                player1.play().catch(e => console.log("Autoplay bloqueado:", e));
+                return;
+            }
+
+            // Caso Playlist: Inicializamos el sistema de doble buffer
+            let currentIndex = 0;
+            let activePlayer = player1;
+            let nextPlayer = player2;
+
+            // Función para preparar el siguiente video en el reproductor oculto
+            const prepareNextVideo = (nextIndex) => {
+                nextPlayer.src = `video/${playlistFiles[nextIndex]}`;
+                nextPlayer.load(); // Forzamos carga en segundo plano
+            };
+
+            // Iniciar el primero
+            activePlayer.src = `video/${playlistFiles[0]}`;
+            activePlayer.play();
+            
+            // Preparar el segundo inmediatamente
+            prepareNextVideo(1);
+
+            // Función de transición (Crossfade)
+            const swapVideos = () => {
+                // 1. Reproducir el oculto (que ya está cargado)
+                nextPlayer.play().then(() => {
+                    // 2. Hacer Crossfade visual (CSS Opacity)
+                    nextPlayer.classList.remove('video-hidden');
+                    nextPlayer.classList.add('video-visible');
+                    
+                    activePlayer.classList.remove('video-visible');
+                    activePlayer.classList.add('video-hidden');
+
+                    // 3. Intercambiar roles de variables
+                    const temp = activePlayer;
+                    activePlayer = nextPlayer;
+                    nextPlayer = temp;
+
+                    // 4. Preparar el siguiente en la fila (en el que ahora está oculto)
+                    currentIndex++;
+                    if (currentIndex >= playlistFiles.length) currentIndex = 0;
+                    
+                    // Calculamos el que viene DESPUÉS del actual para tenerlo listo
+                    let nextIndexToLoad = currentIndex + 1;
+                    if (nextIndexToLoad >= playlistFiles.length) nextIndexToLoad = 0;
+
+                    // Le damos un respiro al navegador antes de cargar el siguiente
+                    setTimeout(() => {
+                        prepareNextVideo(nextIndexToLoad);
+                        // Reconectar el listener al nuevo reproductor activo
+                        activePlayer.onended = swapVideos;
+                    }, 500); // 500ms después de la transición
+                }).catch(e => console.log("Error al reproducir siguiente:", e));
+            };
+
+            // Conectar el evento al primer reproductor
+            activePlayer.onended = swapVideos;
+        });
+        // ---------------------------------------------------
+
+        // --- INICIO DE LÓGICA FIREBASE (Sin cambios) ---
         let watchesData = []; 
         const signedUrlCache = new Map();
         let currentGroupingKey = 'origin';
@@ -187,45 +275,79 @@
         let db; 
         let getSignedUrlFunctionUrl;
 
-        try {
-            // 1. DETECCIÓN DE ENTORNO
-            const hostname = window.location.hostname;
-            
-            // Consideramos "Sandbox" si es Localhost O SI ES tu dominio de pruebas
-            const isSandboxEnv = hostname === "localhost" || 
-                                 hostname.includes("127.0.0.1") || 
-                                 hostname.includes("sbx-relojes-web");
+        // INICIALIZACIÓN INTELIGENTE
+        (async function init() {
+            try {
+                // 1. DETECCIÓN DE ENTORNO
+                const hostname = window.location.hostname;
+                const isSandboxEnv = hostname === "localhost" || 
+                                     hostname.includes("127.0.0.1") || 
+                                     hostname.includes("sbx-relojes-web");
 
-            let firebaseConfig;
+                let firebaseConfig;
 
-            if (isSandboxEnv) {
-                console.log("🛠️ Entorno: Sandbox Detectado (Configuración Hardcodeada)");
-                firebaseConfig = {
-                    apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
-                    authDomain: "sbx-relojes-web.firebaseapp.com",
-                    projectId: "sbx-relojes-web",
-                    storageBucket: "sbx-relojes-web-stg-fmdzxpsv8t73fbgyq2i3c",
-                    messagingSenderId: "326032897645",
-                    appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
-                };
-                getSignedUrlFunctionUrl = 'https://us-central1-sbx-relojes-web.cloudfunctions.net/getSignedUrl';
-            } else {
-                console.log("☁️ Entorno: Producción Detectado (Configuración Automática)");
-                const response = await fetch('/__/firebase/init.json');
-                if (!response.ok) throw new Error(`Fallo init.json: ${response.status}`);
-                firebaseConfig = await response.json();
-                getSignedUrlFunctionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/getSignedUrl`;
+                if (isSandboxEnv) {
+                    console.log("🛠️ Modo: Sandbox (Manual)");
+                    firebaseConfig = {
+                        apiKey: "AIzaSyAkgJTV9LSPX9wLpj8M37OCPGF4ClleCxQ",
+                        authDomain: "sbx-relojes-web.firebaseapp.com",
+                        projectId: "sbx-relojes-web",
+                        storageBucket: "sbx-relojes-web.firebasestorage.app",
+                        messagingSenderId: "326032897645",
+                        appId: "1:326032897645:web:ca43eb5cee4e7bb4573164"
+                    };
+                    getSignedUrlFunctionUrl = 'https://us-central1-sbx-relojes-web.cloudfunctions.net/getSignedUrl';
+                } else {
+                    console.log("☁️ Modo: Producción (Auto)");
+                    const response = await fetch('/__/firebase/init.json');
+                    if (!response.ok) throw new Error("Error cargando config");
+                    firebaseConfig = await response.json();
+                    
+                    getSignedUrlFunctionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/getSignedUrl`;
+                }
+
+                // Inicializar Firebase
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app, "relojes");
+
+                // Cargar datos
+                loadData();
+
+            } catch (error) {
+                console.error("Error crítico:", error);
             }
-
-            // Inicializar Firebase
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app, "relojes");
-
-        } catch (error) {
-            console.error("Error crítico de inicialización:", error);
-        }
+        })();
 
         // --- FUNCIONES Y CARGA ---
+        async function loadData() {
+            const galleryContainer = document.getElementById('gallery-container');
+            const loader = document.getElementById('loader');
+            
+            try {
+                if (!db) throw new Error("DB no inicializada.");
+                
+                const querySnapshot = await getDocs(collection(db, "watches"));
+
+                if (querySnapshot.empty) { 
+                    if(loader) loader.style.display = 'none';
+                    galleryContainer.innerHTML = `<p class="text-yellow-700">No hay relojes cargados.</p>`; 
+                    return; 
+                }
+                
+                watchesData = querySnapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(watch => !watch.isHidden);
+
+                renderGroupView();
+                setupListeners();
+
+            } catch (error) {
+                console.error("Error cargando datos:", error);
+                if(loader) loader.style.display = 'none';
+                galleryContainer.innerHTML = `<p class="text-red-700">Error al cargar la galería.</p>`;
+            }
+        }
+
         async function getSignedUrl(filePath) {
             if (!filePath) return 'https://placehold.co/600x600?text=No+Image';
             if (signedUrlCache.has(filePath)) return signedUrlCache.get(filePath); 
@@ -265,6 +387,7 @@
             const groupTitle = document.getElementById('group-title');
             const filterBar = document.getElementById('filter-bar'); 
             const loader = document.getElementById('loader');
+            
             if(loader) loader.style.display = 'none';
 
             galleryContainer.innerHTML = ''; 
@@ -345,53 +468,29 @@
             }
         }
 
-        // --- DOM LOAD ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            const galleryContainer = document.getElementById('gallery-container');
+        function setupListeners() {
             const groupBySelect = document.getElementById('group-by-select');
             const filterBar = document.getElementById('filter-bar');
+            const galleryContainer = document.getElementById('gallery-container');
+
+            if (groupBySelect) { groupBySelect.addEventListener('change', (e) => { currentGroupingKey = e.target.value; renderGroupView(); }); }
+            filterBar.addEventListener('click', (e) => { if (e.target.closest('#back-to-groups-btn')) renderGroupView(); });
             
-            try {
-                if (!db) throw new Error("DB no inicializada.");
-                
-                const querySnapshot = await getDocs(collection(db, "wathces"));
-
-                if (querySnapshot.empty) { 
-                    document.getElementById('loader').style.display = 'none'; 
-                    galleryContainer.innerHTML = `<p class="text-yellow-700">No hay relojes cargados.</p>`; 
-                    return; 
-                }
-                
-                watchesData = querySnapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter(watch => !watch.isHidden);
-
-                renderGroupView();
-
-                // Listeners
-                if (groupBySelect) { groupBySelect.addEventListener('change', (e) => { currentGroupingKey = e.target.value; renderGroupView(); }); }
-                filterBar.addEventListener('click', (e) => { if (e.target.closest('#back-to-groups-btn')) renderGroupView(); });
-                
-                galleryContainer.addEventListener('click', (e) => {
-                    if (currentView === 'groups') {
-                        const groupCard = e.target.closest('.group-card');
-                        if (groupCard) renderItemView(groupCard.dataset.groupName);
-                    } else if (currentView === 'items') {
-                        let triggerElement = e.target.closest('.view-details-btn') || e.target.closest('.image-trigger');
-                        if (triggerElement) {
-                            const selectedWatch = watchesData.find(w => w.id === triggerElement.dataset.id);
-                            if (selectedWatch) openModal(selectedWatch);
-                        }
+            galleryContainer.addEventListener('click', (e) => {
+                if (currentView === 'groups') {
+                    const groupCard = e.target.closest('.group-card');
+                    if (groupCard) renderItemView(groupCard.dataset.groupName);
+                } else if (currentView === 'items') {
+                    let triggerElement = e.target.closest('.view-details-btn') || e.target.closest('.image-trigger');
+                    if (triggerElement) {
+                        const selectedWatch = watchesData.find(w => w.id === triggerElement.dataset.id);
+                        if (selectedWatch) openModal(selectedWatch);
                     }
-                });
+                }
+            });
+        }
 
-            } catch (error) {
-                console.error("Error en carga:", error);
-                document.getElementById('loader').style.display = 'none';
-                galleryContainer.innerHTML = `<p style="color:red; font-weight:bold;">Error al cargar la galería.</p>`;
-            }
-
-            async function openModal(watch) {
+        async function openModal(watch) {
                 const modalContent = document.getElementById('modal-content');
                 modalContent.innerHTML = `<div class="flex justify-center items-center p-8 h-64"><div class="loader"></div></div>`;
                 
@@ -488,7 +587,6 @@
                     document.body.style.overflow = 'auto';
                 }, { once: true });
             }
-        });
 
         window.openZoomModal = (url) => {
             const zoomModal = document.getElementById('zoom-modal');
